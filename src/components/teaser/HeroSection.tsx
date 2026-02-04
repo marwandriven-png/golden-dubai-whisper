@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import hotelBuilding from "@/assets/hotel-building.jpeg";
-import locationSatellite from "@/assets/location-satellite.jpeg";
 
 const HeroSection = () => {
   return (
@@ -115,25 +114,6 @@ const HeroSection = () => {
           {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-primary/90 via-transparent to-transparent" />
 
-          {/* Location Inset */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.6 }}
-            className="absolute bottom-8 left-8 w-48 h-36 border-[3px] border-background shadow-2xl overflow-hidden z-20"
-          >
-            <img
-              src={locationSatellite}
-              alt="Location"
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-              <div className="relative">
-                <div className="w-3 h-3 bg-destructive rounded-full border-2 border-background" />
-                <div className="absolute inset-0 w-3 h-3 bg-destructive rounded-full animate-pulse-ring" />
-              </div>
-            </div>
-          </motion.div>
 
           {/* Confidential Badge */}
           <motion.div

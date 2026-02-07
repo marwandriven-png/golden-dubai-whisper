@@ -1,1 +1,4 @@
 project_id = "jwtkwuiigdoxxevekmdx"
+
+[functions.notify-investor]
+verify_jwt = false

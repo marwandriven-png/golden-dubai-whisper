@@ -96,51 +96,71 @@
      setIsLoading(false);
    };
  
-   const handleApprove = async (id: string) => {
-     const { data: { session } } = await supabase.auth.getSession();
-     const { error } = await supabase
-       .from("investor_registrations")
-       .update({
-         approval_status: "approved",
-         approved_at: new Date().toISOString(),
-         approved_by: session?.user.id,
-       })
-       .eq("id", id);
- 
-     if (error) {
-       toast({
-         title: "Error approving investor",
-         description: error.message,
-         variant: "destructive",
-       });
-     } else {
-       toast({
-         title: "Investor approved",
-         description: "The investor can now access the investment memorandum.",
-       });
-       fetchRegistrations();
-     }
-   };
- 
-   const handleReject = async (id: string) => {
-     const { error } = await supabase
-       .from("investor_registrations")
-       .update({
-         approval_status: "rejected",
-       })
-       .eq("id", id);
- 
-     if (error) {
-       toast({
-         title: "Error rejecting investor",
-         description: error.message,
-         variant: "destructive",
-       });
-     } else {
-       toast({ title: "Investor rejected" });
-       fetchRegistrations();
-     }
-   };
+    const sendNotification = async (investorId: string, action: "approved" | "rejected") => {
+      try {
+        const { error } = await supabase.functions.invoke("notify-investor", {
+          body: { investorId, action },
+        });
+        if (error) {
+          console.error("Notification error:", error);
+          toast({
+            title: "Notification failed",
+            description: "Status updated but email notification could not be sent.",
+            variant: "destructive",
+          });
+        }
+      } catch (err) {
+        console.error("Notification error:", err);
+      }
+    };
+
+    const handleApprove = async (id: string) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { error } = await supabase
+        .from("investor_registrations")
+        .update({
+          approval_status: "approved",
+          approved_at: new Date().toISOString(),
+          approved_by: session?.user.id,
+        })
+        .eq("id", id);
+
+      if (error) {
+        toast({
+          title: "Error approving investor",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Investor approved",
+          description: "The investor can now access the investment memorandum.",
+        });
+        sendNotification(id, "approved");
+        fetchRegistrations();
+      }
+    };
+
+    const handleReject = async (id: string) => {
+      const { error } = await supabase
+        .from("investor_registrations")
+        .update({
+          approval_status: "rejected",
+        })
+        .eq("id", id);
+
+      if (error) {
+        toast({
+          title: "Error rejecting investor",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Investor rejected" });
+        sendNotification(id, "rejected");
+        fetchRegistrations();
+      }
+    };
  
    const handleRevoke = async (id: string) => {
      const { error } = await supabase

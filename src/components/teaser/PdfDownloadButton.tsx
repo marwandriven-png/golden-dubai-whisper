@@ -44,7 +44,7 @@ const PdfDownloadButton = () => {
     <button
       onClick={handleDownload}
       disabled={isGenerating}
-      className="fixed bottom-8 right-8 z-50 flex items-center gap-2 bg-accent text-accent-foreground px-6 py-3 font-semibold shadow-lg hover:bg-accent/90 transition-all print:hidden"
+      className="flex items-center gap-2 bg-accent text-accent-foreground px-6 py-3 font-semibold shadow-lg hover:bg-accent/90 transition-all"
     >
       {isGenerating ? (
         <>

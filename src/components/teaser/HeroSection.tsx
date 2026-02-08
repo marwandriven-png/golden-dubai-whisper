@@ -65,8 +65,8 @@ const HeroSection = () => {
               transition={{ delay: 0.4 }}
               className="stat-pill"
             >
-              <span className="text-2xl font-bold font-display">7%</span>
-              <span className="text-xs uppercase tracking-wider opacity-80">ROI</span>
+              <span className="text-2xl font-bold font-display">6%</span>
+              <span className="text-xs uppercase tracking-wider opacity-80">Guaranteed ROI</span>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}

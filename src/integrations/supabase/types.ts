@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_audit_log: {
+        Row: {
+          attempted_email: string | null
+          created_at: string
+          details: Json | null
+          device_fingerprint: string | null
+          event_type: string
+          id: string
+          investor_id: string | null
+          ip_address: string | null
+          original_email: string | null
+          token_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          attempted_email?: string | null
+          created_at?: string
+          details?: Json | null
+          device_fingerprint?: string | null
+          event_type: string
+          id?: string
+          investor_id?: string | null
+          ip_address?: string | null
+          original_email?: string | null
+          token_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          attempted_email?: string | null
+          created_at?: string
+          details?: Json | null
+          device_fingerprint?: string | null
+          event_type?: string
+          id?: string
+          investor_id?: string | null
+          ip_address?: string | null
+          original_email?: string | null
+          token_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_audit_log_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investor_registrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "access_audit_log_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "access_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       access_tokens: {
         Row: {
           access_count: number

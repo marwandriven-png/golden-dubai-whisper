@@ -299,10 +299,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // Insert new registration
-    const verificationToken = generateToken();
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
+    // Insert new registration - auto-approve everyone
     const { data: registration, error: insertError } = await supabase
       .from("investor_registrations")
       .insert({
@@ -314,10 +311,10 @@ serve(async (req: Request) => {
         investor_type: "private_investor",
         investment_capacity: "under_5m",
         nda_accepted_at: ndaAcceptedAt || new Date().toISOString(),
-        approval_source: "manual",
-        email_verified: false,
-        verification_token: verificationToken,
-        verification_token_expires_at: verificationExpires,
+        approval_source: "auto_open",
+        email_verified: true,
+        approval_status: "approved",
+        approved_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -327,86 +324,53 @@ serve(async (req: Request) => {
       throw new Error(insertError.message);
     }
 
-    console.log(`Registration created: ${registration.id}`);
+    console.log(`Registration created & auto-approved: ${registration.id}`);
 
-    // Check pre_approved_contacts for auto-approval
-    const { data: preApproved } = await supabase
-      .from("pre_approved_contacts")
-      .select("id, source")
-      .eq("is_active", true)
-      .or(`phone.eq.${cleanPhone},email.eq.${cleanEmail}`);
+    // Generate access token
+    const token = generateToken();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-    const isAutoApproved = preApproved && preApproved.length > 0;
+    const { data: tokenData, error: tokenError } = await supabase
+      .from("access_tokens")
+      .insert({ investor_id: registration.id, token, expires_at: expiresAt })
+      .select()
+      .single();
 
-    if (isAutoApproved) {
-      console.log(`Auto-approving investor ${registration.id}`);
-      const source = preApproved[0].source || "local_db";
-      const token = generateToken();
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    if (tokenError) console.error("Token generation error:", tokenError);
 
-      const { data: tokenData, error: tokenError } = await supabase
-        .from("access_tokens")
-        .insert({ investor_id: registration.id, token, expires_at: expiresAt })
-        .select()
-        .single();
+    await supabase
+      .from("investor_registrations")
+      .update({ access_token_id: tokenData?.id || null })
+      .eq("id", registration.id);
 
-      if (tokenError) console.error("Token generation error:", tokenError);
+    // Log the auto-approval in audit log
+    await supabase.from("access_audit_log").insert({
+      investor_id: registration.id,
+      token_id: tokenData?.id || null,
+      event_type: "access_granted",
+      original_email: cleanEmail,
+      details: { auto_approved: true, source: "open_access" },
+    });
 
-      await supabase
-        .from("investor_registrations")
-        .update({
-          approval_status: "approved",
-          approved_at: new Date().toISOString(),
-          approval_source: source,
-          access_token_id: tokenData?.id || null,
-          email_verified: true,
-          verification_token: null,
-          verification_token_expires_at: null,
-        })
-        .eq("id", registration.id);
-
-      const appUrl = "https://golden-dubai-whisper.lovable.app";
-      const teaserLink = `${appUrl}/teaser?token=${token}`;
-      const ndaText = generateNdaText(cleanEmail);
-
-      try {
-        await resend.emails.send({
-          from: "Investment Team <onboarding@resend.dev>",
-          to: [cleanEmail],
-          subject: "Your Investment Access Has Been Approved",
-          html: buildApprovalEmail(teaserLink, companyName),
-          attachments: [{ filename: "NDA-Confidential-Hotel-Investment.txt", content: btoa(ndaText) }],
-        });
-        console.log(`Approval email with NDA sent to ${cleanEmail}`);
-      } catch (emailErr) {
-        console.error("Email send error:", emailErr);
-      }
-
-      return new Response(
-        JSON.stringify({ success: true, autoApproved: true, accessToken: token, message: "Your registration has been auto-approved." }),
-        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    // Non-pre-approved: send verification email
-    console.log(`Sending verification email to ${cleanEmail}`);
     const appUrl = "https://golden-dubai-whisper.lovable.app";
-    const verifyLink = `${appUrl}/verify-email?token=${verificationToken}`;
+    const teaserLink = `${appUrl}/teaser?token=${token}`;
+    const ndaText = generateNdaText(cleanEmail);
 
     try {
       await resend.emails.send({
         from: "Investment Team <onboarding@resend.dev>",
         to: [cleanEmail],
-        subject: "Verify Your Email – Confidential Investment Access",
-        html: buildVerificationEmail(verifyLink, companyName),
+        subject: "Your Investment Access Has Been Approved",
+        html: buildApprovalEmail(teaserLink, companyName),
+        attachments: [{ filename: "NDA-Confidential-Hotel-Investment.txt", content: btoa(ndaText) }],
       });
-      console.log(`Verification email sent to ${cleanEmail}`);
+      console.log(`Approval email sent to ${cleanEmail}`);
     } catch (emailErr) {
-      console.error("Verification email error:", emailErr);
+      console.error("Email send error:", emailErr);
     }
 
     return new Response(
-      JSON.stringify({ success: true, autoApproved: false, message: "Please check your email to verify your address." }),
+      JSON.stringify({ success: true, autoApproved: true, accessToken: token, message: "Your registration has been approved." }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error: any) {

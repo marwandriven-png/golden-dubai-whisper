@@ -27,6 +27,7 @@ const eventLabels: Record<string, { label: string; color: string; icon: typeof S
   token_invalid: { label: "Invalid Token", color: "text-muted-foreground", icon: XCircle },
   access_extended: { label: "Access Extended", color: "text-accent", icon: CheckCircle },
   access_revoked: { label: "Access Revoked", color: "text-destructive", icon: XCircle },
+  auto_approved: { label: "Auto-Approved", color: "text-amber-500", icon: CheckCircle },
 };
 
 const SecurityAuditLog = () => {

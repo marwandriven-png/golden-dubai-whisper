@@ -212,6 +212,7 @@ serve(async (req: Request) => {
           JSON.stringify({ 
             success: true, 
             autoApproved: true,
+            accessToken: token,
             message: "Your registration has been approved. Check your email for access." 
           }),
           { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -310,6 +311,7 @@ serve(async (req: Request) => {
         JSON.stringify({ 
           success: true, 
           autoApproved: true,
+          accessToken: token,
           message: "Your registration has been auto-approved. Check your email for access." 
         }),
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }

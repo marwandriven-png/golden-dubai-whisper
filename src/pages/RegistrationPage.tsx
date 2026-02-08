@@ -64,6 +64,7 @@ const RegistrationPage = () => {
   const [ndaAccepted, setNdaAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [autoApproved, setAutoApproved] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: "",
     phoneNumber: "",
@@ -137,6 +138,7 @@ const RegistrationPage = () => {
       }
 
       setAutoApproved(data.autoApproved === true);
+      if (data.accessToken) setAccessToken(data.accessToken);
       setStep(3);
     } catch (error: any) {
       console.error("Registration error:", error);
@@ -364,16 +366,11 @@ const RegistrationPage = () => {
               )}
 
               <button
-                onClick={() => navigate("/")}
+                onClick={() => navigate(autoApproved && accessToken ? `/teaser?token=${accessToken}` : "/")}
                 className="bg-accent text-accent-foreground px-8 py-3 font-semibold hover:bg-accent/90 transition-colors"
               >
-                {autoApproved ? "Return to Home" : "Return to Home"}
+                {autoApproved ? "Access Investment Teaser" : "Return to Home"}
               </button>
-              {autoApproved && (
-                <p className="text-xs text-muted-foreground mt-4">
-                  Use the secure link sent to your email to access the teaser. Do not share or forward it.
-                </p>
-              )}
             </motion.div>
           )}
         </AnimatePresence>

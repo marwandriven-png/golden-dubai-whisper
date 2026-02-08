@@ -35,117 +35,133 @@ const ProtectedTeaserRoute = ({ children }: ProtectedTeaserRouteProps) => {
   };
 
   const checkAccess = async () => {
-    // 1. Check for URL token-based access
-    const urlToken = searchParams.get("token");
-    if (urlToken) {
-      const fingerprint = getBrowserFingerprint();
-      const { data, error } = await supabase.rpc("validate_access_token", {
-        token_str: urlToken,
-        current_fingerprint: fingerprint,
-        current_ip: null,
-        current_user_agent: navigator.userAgent,
-      });
+    try {
+      // 1. Check for URL token-based access
+      const urlToken = searchParams.get("token");
+      if (urlToken) {
+        const fingerprint = getBrowserFingerprint();
+        console.log("[Access] Validating token, fingerprint:", fingerprint);
 
-      if (!error && data && data.length > 0 && data[0].is_valid) {
+        const { data, error } = await supabase.rpc("validate_access_token", {
+          token_str: urlToken,
+          current_fingerprint: fingerprint,
+          current_ip: null,
+          current_user_agent: navigator.userAgent,
+        });
+
+        console.log("[Access] RPC result:", { data, error });
+
+        if (error) {
+          console.error("[Access] RPC error:", error);
+          setBlockReason("invalid");
+          setIsLoading(false);
+          return;
+        }
+
+        if (data && data.length > 0 && data[0].is_valid) {
+          setIsAllowed(true);
+          setIsLoading(false);
+          return;
+        }
+
+        const errorMsg = data?.[0]?.error_message || "Invalid access link";
+
+        // Detect device mismatch (forwarded link)
+        if (errorMsg === "DEVICE_MISMATCH") {
+          setBlockReason("device_mismatch");
+
+          const tokenData = data?.[0];
+          notifySecurityEvent("link_forwarded", {
+            originalEmail: "unknown",
+            attemptedFingerprint: fingerprint,
+            attemptedUserAgent: navigator.userAgent,
+            investorId: tokenData?.investor_id,
+          });
+
+          setIsLoading(false);
+          return;
+        }
+
+        if (errorMsg.includes("expired")) {
+          setBlockReason("expired");
+        } else if (errorMsg.includes("revoked")) {
+          setBlockReason("revoked");
+        } else {
+          setBlockReason("invalid");
+        }
+
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Check authenticated session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setRedirectTo("/auth");
+        setIsLoading(false);
+        return;
+      }
+
+      // 3. Check admin role
+      const { data: adminRole } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", session.user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+
+      if (adminRole) {
         setIsAllowed(true);
         setIsLoading(false);
         return;
       }
 
-      const errorMsg = data?.[0]?.error_message || "Invalid access link";
+      // 4. Check approved registration with valid access token
+      const { data: registration } = await supabase
+        .from("investor_registrations")
+        .select("id, approval_status, access_token_id")
+        .eq("email", session.user.email || "")
+        .maybeSingle();
 
-      // Detect device mismatch (forwarded link)
-      if (errorMsg === "DEVICE_MISMATCH") {
-        setBlockReason("device_mismatch");
-
-        // Get token info for notification
-        const tokenData = data?.[0];
-        notifySecurityEvent("link_forwarded", {
-          originalEmail: "unknown",
-          attemptedFingerprint: fingerprint,
-          attemptedUserAgent: navigator.userAgent,
-          investorId: tokenData?.investor_id,
-        });
-
+      if (!registration || registration.approval_status !== "approved") {
+        setBlockReason("pending");
         setIsLoading(false);
         return;
       }
 
-      if (errorMsg.includes("expired")) {
-        setBlockReason("expired");
-      } else if (errorMsg.includes("revoked")) {
-        setBlockReason("revoked");
-      } else {
-        setBlockReason("invalid");
+      // Check if access token is still valid
+      if (registration.access_token_id) {
+        const { data: tokenData } = await (supabase as any)
+          .from("access_tokens")
+          .select("expires_at, is_revoked")
+          .eq("id", registration.access_token_id)
+          .maybeSingle();
+
+        if (tokenData) {
+          if (tokenData.is_revoked) {
+            setBlockReason("revoked");
+            setIsLoading(false);
+            return;
+          }
+          if (new Date(tokenData.expires_at) < new Date()) {
+            setBlockReason("expired");
+            setIsLoading(false);
+            return;
+          }
+        }
       }
 
-      setIsLoading(false);
-      return;
-    }
-
-    // 2. Check authenticated session
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      setRedirectTo("/auth");
-      setIsLoading(false);
-      return;
-    }
-
-    // 3. Check admin role
-    const { data: adminRole } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", session.user.id)
-      .eq("role", "admin")
-      .maybeSingle();
-
-    if (adminRole) {
+      // Approved with valid token
       setIsAllowed(true);
+      await supabase.rpc("update_investor_last_login", {
+        _email: session.user.email || "",
+      });
       setIsLoading(false);
-      return;
-    }
-
-    // 4. Check approved registration with valid access token
-    const { data: registration } = await supabase
-      .from("investor_registrations")
-      .select("id, approval_status, access_token_id")
-      .eq("email", session.user.email || "")
-      .maybeSingle();
-
-    if (!registration || registration.approval_status !== "approved") {
-      setBlockReason("pending");
+    } catch (err) {
+      console.error("[Access] Unexpected error in checkAccess:", err);
+      setBlockReason("invalid");
       setIsLoading(false);
-      return;
     }
-
-    // Check if access token is still valid
-    if (registration.access_token_id) {
-      const { data: tokenData } = await (supabase as any)
-        .from("access_tokens")
-        .select("expires_at, is_revoked")
-        .eq("id", registration.access_token_id)
-        .maybeSingle();
-
-      if (tokenData) {
-        if (tokenData.is_revoked) {
-          setBlockReason("revoked");
-          setIsLoading(false);
-          return;
-        }
-        if (new Date(tokenData.expires_at) < new Date()) {
-          setBlockReason("expired");
-          setIsLoading(false);
-          return;
-        }
-      }
-    }
-
-    // Approved with valid token
-    setIsAllowed(true);
-    await supabase.rpc("update_investor_last_login", {
-      _email: session.user.email || "",
-    });
-    setIsLoading(false);
   };
 
   if (isLoading) {

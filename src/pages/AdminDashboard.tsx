@@ -15,10 +15,12 @@ import {
   Timer,
   FileCheck,
   Users,
+  AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import PreApprovedContacts from "@/components/admin/PreApprovedContacts";
+import SecurityAuditLog from "@/components/admin/SecurityAuditLog";
 
 interface Registration {
   id: string;
@@ -83,7 +85,7 @@ const AdminDashboard = () => {
   const [accessTokens, setAccessTokens] = useState<Record<string, AccessToken>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"pending" | "approved" | "rejected">("pending");
-  const [activeSection, setActiveSection] = useState<"registrations" | "contacts">("registrations");
+  const [activeSection, setActiveSection] = useState<"registrations" | "contacts" | "security">("registrations");
   const [isAdmin, setIsAdmin] = useState(false);
   const [sheetsConfig, setSheetsConfig] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -383,9 +385,15 @@ const AdminDashboard = () => {
             <Shield className="w-4 h-4" />
             Pre-Approved Contacts
           </button>
+          <button onClick={() => setActiveSection("security")} className={`flex items-center gap-2 px-4 py-2 font-medium text-sm ${activeSection === "security" ? "bg-primary text-primary-foreground" : "bg-background border border-border hover:bg-muted"}`}>
+            <AlertTriangle className="w-4 h-4" />
+            Security Logs
+          </button>
         </div>
 
-        {activeSection === "contacts" ? (
+        {activeSection === "security" ? (
+          <SecurityAuditLog />
+        ) : activeSection === "contacts" ? (
           <PreApprovedContacts />
         ) : (
           <>

@@ -20,7 +20,9 @@ const DisclaimerFooter = () => {
             </div>
           </div>
           <a
-            href="/register"
+            href="https://wa.me/971547619887?text=Hello%20Marwan,%20I%20would%20like%20to%20request%20access%20to%20the%20CONFIDENTIAL%20HOTEL%20INVESTMENT%20information%20package.%20I%20understand%20this%20is%20subject%20to%20approval%20and%20NDA."
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-3 bg-accent text-accent-foreground px-8 py-4 font-semibold hover:bg-accent/90 transition-colors"
           >
             <span>Request Information Package</span>

@@ -20,7 +20,7 @@ const DisclaimerFooter = () => {
             </div>
           </div>
           <a
-            href="mailto:invest@confidential.ae"
+            href="/register"
             className="inline-flex items-center gap-3 bg-accent text-accent-foreground px-8 py-4 font-semibold hover:bg-accent/90 transition-colors"
           >
             <span>Request Information Package</span>

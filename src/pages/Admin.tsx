@@ -109,7 +109,7 @@ const AdminDashboard = () => {
   };
 
   const fetchSheetsConfig = async () => {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("google_sheets_config")
       .select("*")
       .eq("is_active", true)
@@ -162,13 +162,13 @@ const AdminDashboard = () => {
       const sheetId = match[1];
 
       if (sheetsConfig) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("google_sheets_config")
           .update({ sheet_url: sheetUrl, sheet_id: sheetId })
           .eq("id", sheetsConfig.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("google_sheets_config")
           .insert({ sheet_url: sheetUrl, sheet_id: sheetId, is_active: true });
         if (error) throw error;
@@ -563,12 +563,12 @@ const AdminDashboard = () => {
                         {investorTypeLabels[reg.investor_type] || reg.investor_type}
                       </td>
                       <td className="px-4 py-3">
-                        {reg.approval_source === 'google_sheets' ? (
+                        {(reg as any).approval_source === 'google_sheets' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium">
                             <Sheet className="w-3 h-3" />
                             Sheets
                           </span>
-                        ) : reg.approval_source === 'local_db' ? (
+                        ) : (reg as any).approval_source === 'local_db' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium">
                             <DatabaseIcon className="w-3 h-3" />
                             Local

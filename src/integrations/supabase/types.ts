@@ -14,59 +14,219 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_tokens: {
+        Row: {
+          access_count: number
+          created_at: string
+          device_fingerprint: string | null
+          expires_at: string
+          first_accessed_at: string | null
+          id: string
+          investor_id: string
+          ip_address: string | null
+          is_revoked: boolean
+          last_accessed_at: string | null
+          token: string
+          updated_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          access_count?: number
+          created_at?: string
+          device_fingerprint?: string | null
+          expires_at: string
+          first_accessed_at?: string | null
+          id?: string
+          investor_id: string
+          ip_address?: string | null
+          is_revoked?: boolean
+          last_accessed_at?: string | null
+          token: string
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          access_count?: number
+          created_at?: string
+          device_fingerprint?: string | null
+          expires_at?: string
+          first_accessed_at?: string | null
+          id?: string
+          investor_id?: string
+          ip_address?: string | null
+          is_revoked?: boolean
+          last_accessed_at?: string | null
+          token?: string
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_tokens_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investor_registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_sheets_config: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          last_synced_at: string | null
+          sheet_id: string
+          sheet_name: string | null
+          sheet_url: string
+          sync_error: string | null
+          sync_status: string | null
+          total_contacts_synced: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          sheet_id: string
+          sheet_name?: string | null
+          sheet_url: string
+          sync_error?: string | null
+          sync_status?: string | null
+          total_contacts_synced?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          sheet_id?: string
+          sheet_name?: string | null
+          sheet_url?: string
+          sync_error?: string | null
+          sync_status?: string | null
+          total_contacts_synced?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       investor_registrations: {
         Row: {
+          access_token_id: string | null
+          approval_source: string | null
           approval_status: Database["public"]["Enums"]["approval_status"]
           approved_at: string | null
           approved_by: string | null
+          company_domain: string | null
           company_name: string | null
           created_at: string
           email: string
+          email_reputation_score: number | null
           full_name: string
           id: string
           investment_capacity: Database["public"]["Enums"]["investment_capacity"]
           investor_type: Database["public"]["Enums"]["investor_type"]
+          is_disposable_email: boolean | null
           last_login_at: string | null
           nda_accepted_at: string
+          nda_document_url: string | null
           phone_number: string | null
           referral_source: string | null
           rejection_reason: string | null
           updated_at: string
         }
         Insert: {
+          access_token_id?: string | null
+          approval_source?: string | null
           approval_status?: Database["public"]["Enums"]["approval_status"]
           approved_at?: string | null
           approved_by?: string | null
+          company_domain?: string | null
           company_name?: string | null
           created_at?: string
           email: string
+          email_reputation_score?: number | null
           full_name: string
           id?: string
           investment_capacity: Database["public"]["Enums"]["investment_capacity"]
           investor_type: Database["public"]["Enums"]["investor_type"]
+          is_disposable_email?: boolean | null
           last_login_at?: string | null
           nda_accepted_at?: string
+          nda_document_url?: string | null
           phone_number?: string | null
           referral_source?: string | null
           rejection_reason?: string | null
           updated_at?: string
         }
         Update: {
+          access_token_id?: string | null
+          approval_source?: string | null
           approval_status?: Database["public"]["Enums"]["approval_status"]
           approved_at?: string | null
           approved_by?: string | null
+          company_domain?: string | null
           company_name?: string | null
           created_at?: string
           email?: string
+          email_reputation_score?: number | null
           full_name?: string
           id?: string
           investment_capacity?: Database["public"]["Enums"]["investment_capacity"]
           investor_type?: Database["public"]["Enums"]["investor_type"]
+          is_disposable_email?: boolean | null
           last_login_at?: string | null
           nda_accepted_at?: string
+          nda_document_url?: string | null
           phone_number?: string | null
           referral_source?: string | null
           rejection_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_access_token"
+            columns: ["access_token_id"]
+            isOneToOne: false
+            referencedRelation: "access_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pre_approved_contacts: {
+        Row: {
+          company_name: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          notes: string | null
+          phone: string | null
+          source: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          phone?: string | null
+          source?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          phone?: string | null
+          source?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -108,6 +268,20 @@ export type Database = {
       update_investor_last_login: {
         Args: { _email: string }
         Returns: undefined
+      }
+      validate_access_token: {
+        Args: {
+          current_fingerprint?: string
+          current_ip?: string
+          current_user_agent?: string
+          token_str: string
+        }
+        Returns: {
+          device_match: boolean
+          error_message: string
+          investor_id: string
+          is_valid: boolean
+        }[]
       }
     }
     Enums: {

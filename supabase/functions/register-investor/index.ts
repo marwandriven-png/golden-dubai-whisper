@@ -240,61 +240,54 @@ serve(async (req: Request) => {
         );
       }
 
-      // Check pre-approved for existing pending registration
-      const { data: preApproved } = await supabase
-        .from("pre_approved_contacts")
-        .select("id, source")
-        .eq("is_active", true)
-        .or(`phone.eq.${cleanPhone},email.eq.${cleanEmail}`);
+      // Auto-approve any pending/rejected registration
+      console.log(`Auto-approving existing registration ${existing.id} (was ${existing.approval_status})`);
+      const token = generateToken();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-      if (preApproved && preApproved.length > 0) {
-        console.log(`Auto-approving existing registration ${existing.id}`);
-        const source = preApproved[0].source || "local_db";
-        const token = generateToken();
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const { data: tokenData } = await supabase
+        .from("access_tokens")
+        .insert({ investor_id: existing.id, token, expires_at: expiresAt })
+        .select()
+        .single();
 
-        const { data: tokenData } = await supabase
-          .from("access_tokens")
-          .insert({ investor_id: existing.id, token, expires_at: expiresAt })
-          .select()
-          .single();
+      await supabase
+        .from("investor_registrations")
+        .update({
+          approval_status: "approved",
+          approved_at: new Date().toISOString(),
+          approval_source: "auto_open",
+          access_token_id: tokenData?.id || null,
+          phone_number: cleanPhone,
+          email_verified: true,
+        })
+        .eq("id", existing.id);
 
-        await supabase
-          .from("investor_registrations")
-          .update({
-            approval_status: "approved",
-            approved_at: new Date().toISOString(),
-            approval_source: source,
-            access_token_id: tokenData?.id || null,
-            phone_number: cleanPhone,
-            email_verified: true,
-          })
-          .eq("id", existing.id);
+      // Log to audit
+      await supabase.from("access_audit_log").insert({
+        investor_id: existing.id,
+        token_id: tokenData?.id || null,
+        event_type: "access_granted",
+        original_email: cleanEmail,
+        details: { auto_approved: true, source: "open_access", previous_status: existing.approval_status },
+      });
 
-        const appUrl = "https://golden-dubai-whisper.lovable.app";
-        const teaserLink = `${appUrl}/teaser?token=${token}`;
-        const ndaText = generateNdaText(cleanEmail);
+      const appUrl = "https://golden-dubai-whisper.lovable.app";
+      const teaserLink = `${appUrl}/teaser?token=${token}`;
 
-        try {
-          await resend.emails.send({
-            from: "Investment Team <onboarding@resend.dev>",
-            to: [cleanEmail],
-            subject: "Your Investment Access Has Been Approved",
-            html: buildApprovalEmail(teaserLink, companyName),
-            attachments: [{ filename: "NDA-Confidential-Hotel-Investment.txt", content: btoa(ndaText) }],
-          });
-        } catch (emailErr) {
-          console.error("Email send error:", emailErr);
-        }
-
-        return new Response(
-          JSON.stringify({ success: true, autoApproved: true, accessToken: token, message: "Your registration has been approved." }),
-          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
+      try {
+        await resend.emails.send({
+          from: "Investment Team <onboarding@resend.dev>",
+          to: [cleanEmail],
+          subject: "Your Investment Access Has Been Approved",
+          html: buildApprovalEmail(teaserLink, companyName),
+        });
+      } catch (emailErr) {
+        console.error("Email send error:", emailErr);
       }
 
       return new Response(
-        JSON.stringify({ success: false, error: "already_registered", message: "This email is already registered. Please check your email for verification or wait for approval.", status: existing.approval_status }),
+        JSON.stringify({ success: true, autoApproved: true, accessToken: token, message: "Your registration has been approved." }),
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }

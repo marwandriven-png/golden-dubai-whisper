@@ -94,10 +94,10 @@ const ProtectedTeaserRoute = ({ children }: ProtectedTeaserRouteProps) => {
         return;
       }
 
-      // 2. Check authenticated session
+      // 2. Check authenticated session — no token means no access, show blocked screen
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        setRedirectTo("/auth");
+        setBlockReason("invalid");
         setIsLoading(false);
         return;
       }

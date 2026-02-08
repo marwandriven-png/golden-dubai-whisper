@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.notify-security-event]
 verify_jwt = false
+
+[functions.verify-email]
+verify_jwt = false

@@ -350,16 +350,14 @@ const RegistrationPage = () => {
               ) : (
                 <>
                   <p className="text-muted-foreground mb-6">
-                    Your registration has been submitted and is under review. Our team
-                    will verify your credentials and you'll receive an email and WhatsApp
-                    notification once your access has been approved.
+                    We've sent a verification email to <strong>{formData.email}</strong>. Please click the link in the email to verify your address.
                   </p>
                   <div className="bg-muted p-4 text-sm text-left mb-6">
                     <div className="font-semibold mb-2">What happens next?</div>
                     <ul className="space-y-2 text-muted-foreground">
-                      <li>1. Our team reviews your registration (typically 24-48 hours)</li>
-                      <li>2. You'll receive a notification upon approval</li>
-                      <li>3. Access the full investment teaser via the secure link provided</li>
+                      <li>1. Check your email and click the verification link</li>
+                      <li>2. Once verified, our admin team will be notified</li>
+                      <li>3. You'll receive a secure access link upon approval (typically 24–48 hours)</li>
                     </ul>
                   </div>
                 </>

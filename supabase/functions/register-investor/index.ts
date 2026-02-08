@@ -150,11 +150,42 @@ serve(async (req: Request) => {
 
     if (existing) {
       if (existing.approval_status === "approved") {
+        // Fetch existing valid token or generate a new one
+        const { data: existingToken } = await supabase
+          .from("access_tokens")
+          .select("token, expires_at, is_revoked")
+          .eq("investor_id", existing.id)
+          .eq("is_revoked", false)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        let tokenStr: string;
+        if (existingToken && new Date(existingToken.expires_at) > new Date()) {
+          tokenStr = existingToken.token;
+        } else {
+          // Generate fresh token
+          tokenStr = generateToken();
+          const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+          const { data: newToken } = await supabase
+            .from("access_tokens")
+            .insert({ investor_id: existing.id, token: tokenStr, expires_at: expiresAt })
+            .select()
+            .single();
+          if (newToken) {
+            await supabase
+              .from("investor_registrations")
+              .update({ access_token_id: newToken.id })
+              .eq("id", existing.id);
+          }
+        }
+
         return new Response(
           JSON.stringify({ 
             success: true, 
             autoApproved: true,
-            message: "You're already approved! Check your email for the access link." 
+            accessToken: tokenStr,
+            message: "You're already approved!" 
           }),
           { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );

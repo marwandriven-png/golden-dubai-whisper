@@ -120,9 +120,9 @@ const AssetHighlights = () => {
               <h3 className="font-display font-semibold mb-6">Investment Metrics</h3>
               <div className="grid grid-cols-3 gap-6">
                 <div>
-                  <div className="metric-large">7%</div>
+                  <div className="metric-large">6%</div>
                   <div className="text-sm text-muted-foreground uppercase tracking-wider mt-2">
-                    Current ROI
+                    Guaranteed ROI
                   </div>
                 </div>
                 <div>

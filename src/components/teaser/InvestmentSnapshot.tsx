@@ -4,7 +4,7 @@ import { Building2, Key, TrendingUp, Square, Calendar, Users } from "lucide-reac
 const metrics = [
   { icon: Key, label: "Keys / Rooms", value: "120", sublabel: "Hotel rooms" },
   { icon: Building2, label: "Property Type", value: "Full-Service", sublabel: "Hotel" },
-  { icon: TrendingUp, label: "Current Yield", value: "7%", sublabel: "Net ROI" },
+  { icon: TrendingUp, label: "Guaranteed ROI", value: "6%", sublabel: "Valid contract" },
   { icon: Square, label: "Plot Size", value: "21,000", sublabel: "Square feet" },
   { icon: Calendar, label: "Structure", value: "B2+G+10", sublabel: "Floors" },
   { icon: Users, label: "Status", value: "Operational", sublabel: "Immediate takeover" },
@@ -73,7 +73,7 @@ const InvestmentSnapshot = () => {
           <div className="mt-4 md:mt-0 flex gap-4">
             <div className="border-l border-primary-foreground/20 pl-4">
               <div className="text-xs text-primary-foreground/60">Ownership</div>
-              <div className="font-semibold">Freehold</div>
+              <div className="font-semibold">GCC Only</div>
             </div>
             <div className="border-l border-primary-foreground/20 pl-4">
               <div className="text-xs text-primary-foreground/60">Transaction</div>

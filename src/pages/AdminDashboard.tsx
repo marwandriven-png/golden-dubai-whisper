@@ -2,23 +2,51 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Users,
   Clock,
   CheckCircle,
   XCircle,
   LogOut,
   RefreshCw,
   Building2,
-  Database as DatabaseIcon,
   Sheet,
   ExternalLink,
   Settings,
+  Shield,
+  Timer,
+  FileCheck,
+  Users,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import type { Database } from "@/integrations/supabase/types";
+import PreApprovedContacts from "@/components/admin/PreApprovedContacts";
 
-type InvestorRegistration = Database["public"]["Tables"]["investor_registrations"]["Row"];
+interface Registration {
+  id: string;
+  email: string;
+  full_name: string;
+  company_name: string | null;
+  company_domain: string | null;
+  phone_number: string | null;
+  investor_type: string;
+  investment_capacity: string;
+  approval_status: string;
+  approval_source: string | null;
+  approved_at: string | null;
+  nda_accepted_at: string;
+  access_token_id: string | null;
+  last_login_at: string | null;
+  created_at: string;
+  email_reputation_score: number | null;
+}
+
+interface AccessToken {
+  id: string;
+  expires_at: string;
+  is_revoked: boolean;
+  access_count: number;
+  last_accessed_at: string | null;
+  first_accessed_at: string | null;
+}
 
 const investorTypeLabels: Record<string, string> = {
   family_office: "Family Office",
@@ -36,18 +64,31 @@ const capacityLabels: Record<string, string> = {
   over_50m: "> $50M",
 };
 
+function getExpiryInfo(expiresAt: string): { label: string; isExpired: boolean; color: string } {
+  const now = new Date();
+  const expiry = new Date(expiresAt);
+  const diff = expiry.getTime() - now.getTime();
+
+  if (diff <= 0) return { label: "Expired", isExpired: true, color: "text-destructive" };
+
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+  if (hours > 0) return { label: `${hours}h ${minutes}m left`, isExpired: false, color: hours < 4 ? "text-amber-500" : "text-green-600" };
+  return { label: `${minutes}m left`, isExpired: false, color: "text-amber-500" };
+}
+
 const AdminDashboard = () => {
-  const [registrations, setRegistrations] = useState<InvestorRegistration[]>([]);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [accessTokens, setAccessTokens] = useState<Record<string, AccessToken>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"pending" | "approved" | "rejected">("pending");
+  const [activeSection, setActiveSection] = useState<"registrations" | "contacts">("registrations");
   const [isAdmin, setIsAdmin] = useState(false);
-
-  // Google Sheets sync panel state
   const [sheetsConfig, setSheetsConfig] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isEditingSheets, setIsEditingSheets] = useState(false);
   const [sheetUrl, setSheetUrl] = useState("");
-
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -64,10 +105,7 @@ const AdminDashboard = () => {
 
   const checkAdminAccess = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      navigate("/auth");
-      return;
-    }
+    if (!session) { navigate("/auth"); return; }
 
     const { data } = await supabase
       .from("user_roles")
@@ -77,15 +115,10 @@ const AdminDashboard = () => {
       .maybeSingle();
 
     if (!data) {
-      toast({
-        title: "Access denied",
-        description: "You don't have admin privileges.",
-        variant: "destructive",
-      });
+      toast({ title: "Access denied", description: "Admin privileges required.", variant: "destructive" });
       navigate("/");
       return;
     }
-
     setIsAdmin(true);
   };
 
@@ -97,25 +130,40 @@ const AdminDashboard = () => {
       .order("created_at", { ascending: false });
 
     if (error) {
-      toast({
-        title: "Error loading registrations",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error loading registrations", description: error.message, variant: "destructive" });
     } else {
-      setRegistrations(data || []);
+      const regs = (data || []) as unknown as Registration[];
+      setRegistrations(regs);
+
+      // Fetch access tokens for approved registrations
+      const tokenIds = regs
+        .filter((r) => r.access_token_id)
+        .map((r) => r.access_token_id!);
+
+      if (tokenIds.length > 0) {
+        const { data: tokens } = await (supabase as any)
+          .from("access_tokens")
+          .select("id, expires_at, is_revoked, access_count, last_accessed_at, first_accessed_at")
+          .in("id", tokenIds);
+
+        if (tokens) {
+          const tokenMap: Record<string, AccessToken> = {};
+          tokens.forEach((t: AccessToken) => { tokenMap[t.id] = t; });
+          setAccessTokens(tokenMap);
+        }
+      }
     }
     setIsLoading(false);
   };
 
   const fetchSheetsConfig = async () => {
-    const { data, error } = await (supabase as any)
+    const { data } = await (supabase as any)
       .from("google_sheets_config")
       .select("*")
       .eq("is_active", true)
       .maybeSingle();
 
-    if (!error && data) {
+    if (data) {
       setSheetsConfig(data);
       setSheetUrl(data.sheet_url);
     }
@@ -124,29 +172,15 @@ const AdminDashboard = () => {
   const handleSheetsSync = async () => {
     setIsSyncing(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
       const { data, error } = await supabase.functions.invoke("sync-google-sheets", {
         body: { forceSync: true },
       });
-
       if (error) throw error;
-
-      toast({
-        title: "Sync completed",
-        description: `Successfully synced ${data.contactsSynced || 0} contacts from Google Sheets`,
-      });
-
+      toast({ title: "Sync completed", description: `Synced ${data?.contactsSynced || 0} contacts` });
       await fetchSheetsConfig();
       await fetchRegistrations();
     } catch (error: any) {
-      console.error("Sync error:", error);
-      toast({
-        title: "Sync failed",
-        description: error.message || "Failed to sync Google Sheets",
-        variant: "destructive",
-      });
+      toast({ title: "Sync failed", description: error.message, variant: "destructive" });
     } finally {
       setIsSyncing(false);
     }
@@ -155,10 +189,7 @@ const AdminDashboard = () => {
   const handleSaveSheetsConfig = async () => {
     try {
       const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      if (!match) {
-        throw new Error("Invalid Google Sheets URL");
-      }
-
+      if (!match) throw new Error("Invalid Google Sheets URL");
       const sheetId = match[1];
 
       if (sheetsConfig) {
@@ -174,37 +205,11 @@ const AdminDashboard = () => {
         if (error) throw error;
       }
 
-      toast({
-        title: "Configuration saved",
-        description: "Google Sheets configuration updated successfully",
-      });
-
+      toast({ title: "Configuration saved" });
       setIsEditingSheets(false);
       await fetchSheetsConfig();
     } catch (error: any) {
-      toast({
-        title: "Save failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const sendNotification = async (investorId: string, action: "approved" | "rejected") => {
-    try {
-      const { error } = await supabase.functions.invoke("notify-investor", {
-        body: { investorId, action },
-      });
-      if (error) {
-        console.error("Notification error:", error);
-        toast({
-          title: "Notification failed",
-          description: "Status updated but email notification could not be sent.",
-          variant: "destructive",
-        });
-      }
-    } catch (err) {
-      console.error("Notification error:", err);
+      toast({ title: "Save failed", description: error.message, variant: "destructive" });
     }
   };
 
@@ -220,59 +225,45 @@ const AdminDashboard = () => {
       .eq("id", id);
 
     if (error) {
-      toast({
-        title: "Error approving investor",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error approving investor", description: error.message, variant: "destructive" });
     } else {
-      toast({
-        title: "Investor approved",
-        description: "The investor can now access the investment memorandum.",
-      });
-      sendNotification(id, "approved");
-      fetchRegistrations();
+      toast({ title: "Investor approved", description: "Sending notification email with teaser link..." });
+      // Notify generates token + sends email
+      supabase.functions.invoke("notify-investor", { body: { investorId: id, action: "approved" } }).catch(console.error);
+      setTimeout(fetchRegistrations, 2000);
     }
   };
 
   const handleReject = async (id: string) => {
     const { error } = await supabase
       .from("investor_registrations")
-      .update({
-        approval_status: "rejected",
-      })
+      .update({ approval_status: "rejected" })
       .eq("id", id);
 
     if (error) {
-      toast({
-        title: "Error rejecting investor",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error rejecting investor", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Investor rejected" });
-      sendNotification(id, "rejected");
+      supabase.functions.invoke("notify-investor", { body: { investorId: id, action: "rejected" } }).catch(console.error);
       fetchRegistrations();
     }
   };
 
-  const handleRevoke = async (id: string) => {
+  const handleRevokeAccess = async (id: string, tokenId: string | null) => {
+    // Revoke token if exists
+    if (tokenId) {
+      await (supabase as any)
+        .from("access_tokens")
+        .update({ is_revoked: true })
+        .eq("id", tokenId);
+    }
+    // Set back to pending
     const { error } = await supabase
       .from("investor_registrations")
-      .update({
-        approval_status: "pending",
-        approved_at: null,
-        approved_by: null,
-      })
+      .update({ approval_status: "pending", approved_at: null, approved_by: null })
       .eq("id", id);
 
-    if (error) {
-      toast({
-        title: "Error revoking access",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
+    if (!error) {
       toast({ title: "Access revoked" });
       fetchRegistrations();
     }
@@ -283,9 +274,7 @@ const AdminDashboard = () => {
     navigate("/");
   };
 
-  const filteredRegistrations = registrations.filter(
-    (r) => r.approval_status === activeTab
-  );
+  const filteredRegistrations = registrations.filter((r) => r.approval_status === activeTab);
 
   const stats = {
     total: registrations.length,
@@ -307,6 +296,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-secondary">
+      {/* Header */}
       <header className="bg-primary text-primary-foreground px-8 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -315,15 +305,10 @@ const AdminDashboard = () => {
             </div>
             <div>
               <div className="font-display font-bold">Admin Dashboard</div>
-              <div className="text-xs text-primary-foreground/60">
-                Investor Management
-              </div>
+              <div className="text-xs text-primary-foreground/60">Investor Management</div>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 text-sm text-primary-foreground/60 hover:text-primary-foreground transition-colors"
-          >
+          <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-primary-foreground/60 hover:text-primary-foreground transition-colors">
             <LogOut className="w-4 h-4" />
             <span>Logout</span>
           </button>
@@ -331,309 +316,222 @@ const AdminDashboard = () => {
       </header>
 
       <div className="max-w-6xl mx-auto px-8 py-8">
-        {/* Google Sheets Sync Panel */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-background border border-border p-6 mb-8"
-        >
+        {/* Google Sheets Panel */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-background border border-border p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-primary/10 flex items-center justify-center">
-                {!sheetsConfig ? (
-                  <Settings className="w-5 h-5 text-muted-foreground" />
-                ) : sheetsConfig.sync_status === "success" ? (
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                ) : sheetsConfig.sync_status === "error" ? (
-                  <XCircle className="w-5 h-5 text-red-500" />
-                ) : sheetsConfig.sync_status === "syncing" ? (
-                  <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />
-                ) : (
-                  <Clock className="w-5 h-5 text-amber-500" />
-                )}
+                {!sheetsConfig ? <Settings className="w-5 h-5 text-muted-foreground" />
+                  : sheetsConfig.sync_status === "success" ? <CheckCircle className="w-5 h-5 text-green-600" />
+                  : sheetsConfig.sync_status === "error" ? <XCircle className="w-5 h-5 text-destructive" />
+                  : sheetsConfig.sync_status === "syncing" ? <RefreshCw className="w-5 h-5 text-accent animate-spin" />
+                  : <Clock className="w-5 h-5 text-amber-500" />}
               </div>
               <div>
                 <h3 className="font-semibold">Google Sheets Auto-Approval</h3>
                 <p className="text-xs text-muted-foreground">
-                  {!sheetsConfig
-                    ? "Not configured"
-                    : sheetsConfig.sync_status === "success"
-                      ? "Synced successfully"
-                      : sheetsConfig.sync_status === "error"
-                        ? "Sync failed"
-                        : sheetsConfig.sync_status === "syncing"
-                          ? "Syncing..."
-                          : "Pending sync"}
+                  {!sheetsConfig ? "Not configured" : sheetsConfig.sync_status === "success" ? `Synced • ${sheetsConfig.total_contacts_synced || 0} contacts` : sheetsConfig.sync_status === "error" ? "Sync failed" : "Pending sync"}
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => setIsEditingSheets(!isEditingSheets)}
-              className="text-xs text-accent hover:underline"
-            >
+            <button onClick={() => setIsEditingSheets(!isEditingSheets)} className="text-xs text-accent hover:underline">
               {isEditingSheets ? "Cancel" : "Configure"}
             </button>
           </div>
 
           {isEditingSheets ? (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Google Sheets URL
-                </label>
-                <input
-                  type="url"
-                  value={sheetUrl}
-                  onChange={(e) => setSheetUrl(e.target.value)}
-                  placeholder="https://docs.google.com/spreadsheets/d/..."
-                  className="w-full border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Paste the full URL of your Google Sheet containing pre-approved contacts
-                </p>
-              </div>
-              <button
-                onClick={handleSaveSheetsConfig}
-                className="w-full bg-accent text-accent-foreground py-2 text-sm font-semibold hover:bg-accent/90 transition-colors"
-              >
-                Save Configuration
-              </button>
+            <div className="space-y-3">
+              <input type="url" value={sheetUrl} onChange={(e) => setSheetUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/..." className="w-full border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+              <p className="text-xs text-muted-foreground">Sheet must be publicly accessible. Must have "email" or "phone" column headers.</p>
+              <button onClick={handleSaveSheetsConfig} className="w-full bg-accent text-accent-foreground py-2 text-sm font-semibold hover:bg-accent/90 transition-colors">Save Configuration</button>
             </div>
           ) : sheetsConfig ? (
             <div className="space-y-3">
-              <div className="bg-muted p-3 text-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-muted-foreground">Sheet URL:</span>
-                  <a
-                    href={sheetsConfig.sheet_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent hover:underline flex items-center gap-1"
-                  >
-                    <span className="max-w-[200px] truncate">View Sheet</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-                {sheetsConfig.last_synced_at && (
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-muted-foreground">Last Synced:</span>
-                    <span className="font-medium">
-                      {new Date(sheetsConfig.last_synced_at).toLocaleString()}
-                    </span>
+              <div className="bg-muted p-3 text-sm flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">Sheet:</span>
+                    <a href={sheetsConfig.sheet_url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline flex items-center gap-1">
+                      View <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Contacts Synced:</span>
-                  <span className="font-medium">{sheetsConfig.total_contacts_synced || 0}</span>
+                  {sheetsConfig.last_synced_at && (
+                    <div className="text-muted-foreground">Last synced: {new Date(sheetsConfig.last_synced_at).toLocaleString()}</div>
+                  )}
                 </div>
+                <button onClick={handleSheetsSync} disabled={isSyncing} className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium disabled:opacity-50 hover:bg-primary/90 transition-colors">
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+                  {isSyncing ? "Syncing..." : "Sync Now"}
+                </button>
               </div>
-
               {sheetsConfig.sync_error && (
-                <div className="bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                <div className="bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
                   <strong>Error:</strong> {sheetsConfig.sync_error}
                 </div>
               )}
-
-              <button
-                onClick={handleSheetsSync}
-                disabled={isSyncing}
-                className="w-full bg-primary text-primary-foreground py-2 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-primary/90 transition-colors"
-              >
-                <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
-                <span>{isSyncing ? "Syncing..." : "Sync Now"}</span>
-              </button>
             </div>
-          ) : (
-            <div className="text-center py-6 text-sm text-muted-foreground">
-              <p>No Google Sheets configuration found.</p>
-              <p className="mt-2">Click "Configure" to set up auto-approval from Google Sheets.</p>
-            </div>
-          )}
+          ) : null}
         </motion.div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-background p-4 border border-border">
-            <div className="text-sm text-muted-foreground mb-1">Total</div>
-            <div className="text-3xl font-bold font-display">{stats.total}</div>
-          </div>
-          <div className="bg-background p-4 border border-border">
-            <div className="text-sm text-muted-foreground mb-1">Pending</div>
-            <div className="text-3xl font-bold font-display text-amber-500">
-              {stats.pending}
-            </div>
-          </div>
-          <div className="bg-background p-4 border border-border">
-            <div className="text-sm text-muted-foreground mb-1">Approved</div>
-            <div className="text-3xl font-bold font-display text-green-500">
-              {stats.approved}
-            </div>
-          </div>
-          <div className="bg-background p-4 border border-border">
-            <div className="text-sm text-muted-foreground mb-1">Rejected</div>
-            <div className="text-3xl font-bold font-display text-red-500">
-              {stats.rejected}
-            </div>
-          </div>
-        </div>
-
+        {/* Section Toggle */}
         <div className="flex items-center gap-2 mb-6">
-          <button
-            onClick={() => setActiveTab("pending")}
-            className={`flex items-center gap-2 px-4 py-2 font-medium ${activeTab === "pending"
-              ? "bg-accent text-accent-foreground"
-              : "bg-background border border-border hover:bg-muted"
-              }`}
-          >
-            <Clock className="w-4 h-4" />
-            <span>Pending ({stats.pending})</span>
+          <button onClick={() => setActiveSection("registrations")} className={`flex items-center gap-2 px-4 py-2 font-medium text-sm ${activeSection === "registrations" ? "bg-primary text-primary-foreground" : "bg-background border border-border hover:bg-muted"}`}>
+            <Users className="w-4 h-4" />
+            Registrations ({stats.total})
           </button>
-          <button
-            onClick={() => setActiveTab("approved")}
-            className={`flex items-center gap-2 px-4 py-2 font-medium ${activeTab === "approved"
-              ? "bg-accent text-accent-foreground"
-              : "bg-background border border-border hover:bg-muted"
-              }`}
-          >
-            <CheckCircle className="w-4 h-4" />
-            <span>Approved ({stats.approved})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("rejected")}
-            className={`flex items-center gap-2 px-4 py-2 font-medium ${activeTab === "rejected"
-              ? "bg-accent text-accent-foreground"
-              : "bg-background border border-border hover:bg-muted"
-              }`}
-          >
-            <XCircle className="w-4 h-4" />
-            <span>Rejected ({stats.rejected})</span>
-          </button>
-          <button
-            onClick={fetchRegistrations}
-            disabled={isLoading}
-            className="ml-auto flex items-center gap-2 px-4 py-2 bg-background border border-border hover:bg-muted"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
-            <span>Refresh</span>
+          <button onClick={() => setActiveSection("contacts")} className={`flex items-center gap-2 px-4 py-2 font-medium text-sm ${activeSection === "contacts" ? "bg-primary text-primary-foreground" : "bg-background border border-border hover:bg-muted"}`}>
+            <Shield className="w-4 h-4" />
+            Pre-Approved Contacts
           </button>
         </div>
 
-        <div className="bg-background border border-border overflow-hidden">
-          {isLoading ? (
-            <div className="p-8 text-center text-muted-foreground">Loading...</div>
-          ) : filteredRegistrations.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">
-              No {activeTab} registrations
+        {activeSection === "contacts" ? (
+          <PreApprovedContacts />
+        ) : (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-background p-4 border border-border">
+                <div className="text-sm text-muted-foreground mb-1">Total</div>
+                <div className="text-3xl font-bold font-display">{stats.total}</div>
+              </div>
+              <div className="bg-background p-4 border border-border">
+                <div className="text-sm text-muted-foreground mb-1">Pending</div>
+                <div className="text-3xl font-bold font-display text-amber-500">{stats.pending}</div>
+              </div>
+              <div className="bg-background p-4 border border-border">
+                <div className="text-sm text-muted-foreground mb-1">Approved</div>
+                <div className="text-3xl font-bold font-display text-green-600">{stats.approved}</div>
+              </div>
+              <div className="bg-background p-4 border border-border">
+                <div className="text-sm text-muted-foreground mb-1">Rejected</div>
+                <div className="text-3xl font-bold font-display text-destructive">{stats.rejected}</div>
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="text-left px-4 py-3 font-medium">Investor</th>
-                    <th className="text-left px-4 py-3 font-medium">Type</th>
-                    <th className="text-left px-4 py-3 font-medium">Source</th>
-                    <th className="text-left px-4 py-3 font-medium">Capacity</th>
-                    <th className="text-left px-4 py-3 font-medium">Registered</th>
-                    {activeTab === "approved" && (
-                      <th className="text-left px-4 py-3 font-medium">Last Login</th>
-                    )}
-                    <th className="text-right px-4 py-3 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRegistrations.map((reg) => (
-                    <motion.tr
-                      key={reg.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="border-t border-border"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="font-medium">{reg.full_name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {reg.email}
-                        </div>
-                        {reg.company_name && (
-                          <div className="text-xs text-muted-foreground">
-                            {reg.company_name}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {investorTypeLabels[reg.investor_type] || reg.investor_type}
-                      </td>
-                      <td className="px-4 py-3">
-                        {(reg as any).approval_source === 'google_sheets' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium">
-                            <Sheet className="w-3 h-3" />
-                            Sheets
-                          </span>
-                        ) : (reg as any).approval_source === 'local_db' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium">
-                            <DatabaseIcon className="w-3 h-3" />
-                            Local
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium">
-                            Manual
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {capacityLabels[reg.investment_capacity] ||
-                          reg.investment_capacity}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {new Date(reg.created_at).toLocaleDateString()}
-                      </td>
-                      {activeTab === "approved" && (
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {reg.last_login_at
-                            ? new Date(reg.last_login_at).toLocaleDateString()
-                            : "Never"}
-                        </td>
-                      )}
-                      <td className="px-4 py-3 text-right">
-                        {activeTab === "pending" && (
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => handleApprove(reg.id)}
-                              className="px-3 py-1 bg-green-500 text-white text-xs font-medium hover:bg-green-600"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleReject(reg.id)}
-                              className="px-3 py-1 bg-red-500 text-white text-xs font-medium hover:bg-red-600"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        )}
+
+            {/* Tabs */}
+            <div className="flex items-center gap-2 mb-6">
+              {(["pending", "approved", "rejected"] as const).map((tab) => (
+                <button key={tab} onClick={() => setActiveTab(tab)} className={`flex items-center gap-2 px-4 py-2 font-medium text-sm ${activeTab === tab ? "bg-accent text-accent-foreground" : "bg-background border border-border hover:bg-muted"}`}>
+                  {tab === "pending" && <Clock className="w-4 h-4" />}
+                  {tab === "approved" && <CheckCircle className="w-4 h-4" />}
+                  {tab === "rejected" && <XCircle className="w-4 h-4" />}
+                  <span className="capitalize">{tab} ({stats[tab]})</span>
+                </button>
+              ))}
+              <button onClick={fetchRegistrations} disabled={isLoading} className="ml-auto flex items-center gap-2 px-4 py-2 bg-background border border-border hover:bg-muted text-sm">
+                <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+            </div>
+
+            {/* Table */}
+            <div className="bg-background border border-border overflow-hidden">
+              {isLoading ? (
+                <div className="p-8 text-center text-muted-foreground">Loading...</div>
+              ) : filteredRegistrations.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">No {activeTab} registrations</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-medium">Investor</th>
+                        <th className="text-left px-4 py-3 font-medium">Source</th>
+                        <th className="text-left px-4 py-3 font-medium">NDA</th>
                         {activeTab === "approved" && (
-                          <button
-                            onClick={() => handleRevoke(reg.id)}
-                            className="px-3 py-1 bg-amber-500 text-white text-xs font-medium hover:bg-amber-600"
-                          >
-                            Revoke
-                          </button>
+                          <>
+                            <th className="text-left px-4 py-3 font-medium">Access Expiry</th>
+                            <th className="text-left px-4 py-3 font-medium">Views</th>
+                          </>
                         )}
-                        {activeTab === "rejected" && (
-                          <button
-                            onClick={() => handleApprove(reg.id)}
-                            className="px-3 py-1 bg-green-500 text-white text-xs font-medium hover:bg-green-600"
-                          >
-                            Re-approve
-                          </button>
-                        )}
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
+                        <th className="text-left px-4 py-3 font-medium">Registered</th>
+                        <th className="text-right px-4 py-3 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredRegistrations.map((reg) => {
+                        const token = reg.access_token_id ? accessTokens[reg.access_token_id] : null;
+                        const expiryInfo = token ? getExpiryInfo(token.expires_at) : null;
+
+                        return (
+                          <motion.tr key={reg.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="border-t border-border">
+                            <td className="px-4 py-3">
+                              <div className="font-medium">{reg.email}</div>
+                              <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                {reg.company_name && <span>{reg.company_name}</span>}
+                                {reg.company_domain && <span className="text-accent">@{reg.company_domain}</span>}
+                              </div>
+                              {reg.phone_number && (
+                                <div className="text-xs text-muted-foreground">{reg.phone_number}</div>
+                              )}
+                              {reg.email_reputation_score !== null && (
+                                <div className="text-[10px] text-muted-foreground mt-0.5">
+                                  Rep: {reg.email_reputation_score}/100
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {reg.approval_source === "google_sheets" ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium"><Sheet className="w-3 h-3" />Sheets</span>
+                              ) : reg.approval_source === "local_db" ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium"><Shield className="w-3 h-3" />Whitelist</span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Manual</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center gap-1 text-xs">
+                                <FileCheck className="w-3 h-3 text-green-600" />
+                                {new Date(reg.nda_accepted_at).toLocaleDateString()}
+                              </span>
+                            </td>
+                            {activeTab === "approved" && (
+                              <>
+                                <td className="px-4 py-3">
+                                  {token && !token.is_revoked ? (
+                                    <span className={`inline-flex items-center gap-1 text-xs font-medium ${expiryInfo?.color}`}>
+                                      <Timer className="w-3 h-3" />
+                                      {expiryInfo?.label}
+                                    </span>
+                                  ) : token?.is_revoked ? (
+                                    <span className="text-xs text-destructive font-medium">Revoked</span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">No token</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-muted-foreground text-xs">
+                                  {token ? token.access_count : 0}
+                                </td>
+                              </>
+                            )}
+                            <td className="px-4 py-3 text-muted-foreground text-xs">
+                              {new Date(reg.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {activeTab === "pending" && (
+                                <div className="flex justify-end gap-2">
+                                  <button onClick={() => handleApprove(reg.id)} className="px-3 py-1 bg-green-600 text-primary-foreground text-xs font-medium hover:bg-green-700 transition-colors">Approve</button>
+                                  <button onClick={() => handleReject(reg.id)} className="px-3 py-1 bg-destructive text-destructive-foreground text-xs font-medium hover:bg-destructive/90 transition-colors">Reject</button>
+                                </div>
+                              )}
+                              {activeTab === "approved" && (
+                                <button onClick={() => handleRevokeAccess(reg.id, reg.access_token_id)} className="px-3 py-1 bg-amber-500 text-primary-foreground text-xs font-medium hover:bg-amber-600 transition-colors">Revoke</button>
+                              )}
+                              {activeTab === "rejected" && (
+                                <button onClick={() => handleApprove(reg.id)} className="px-3 py-1 bg-green-600 text-primary-foreground text-xs font-medium hover:bg-green-700 transition-colors">Re-approve</button>
+                              )}
+                            </td>
+                          </motion.tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

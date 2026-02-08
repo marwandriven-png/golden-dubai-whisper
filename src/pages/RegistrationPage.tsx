@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Check, ChevronRight, FileText, User, CheckCircle } from "lucide-react";
+import { Check, ChevronRight, FileText, User, CheckCircle, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -11,35 +11,59 @@ const registrationSchema = z.object({
   phoneNumber: z.string().trim().min(5, "Phone number is required").max(50),
 });
 
-const NDA_TEXT = `CONFIDENTIALITY AND NON-DISCLOSURE AGREEMENT
+function generateNdaText(email: string): string {
+  const domain = email.split("@")[1] || "";
+  const companyName = domain.split(".")[0] || "the Recipient";
+  const capitalized = companyName.charAt(0).toUpperCase() + companyName.slice(1);
+  const now = new Date();
+  const expiryDate = new Date(now.getTime() + 2 * 365 * 24 * 60 * 60 * 1000);
 
-This Confidentiality and Non-Disclosure Agreement ("Agreement") is entered into as of the date of acceptance below.
+  return `CONFIDENTIALITY AND NON-DISCLOSURE AGREEMENT
+
+This Confidentiality and Non-Disclosure Agreement ("Agreement") is entered into as of ${now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.
+
+PARTIES:
+Disclosing Party: The Investment Sponsor ("Sponsor")
+Receiving Party: ${capitalized} ("Recipient")
+
+PROJECT: Confidential Hotel Investment Opportunity
+ASSET LOCATION: Deira, Dubai, United Arab Emirates
+ASSET TYPE: Full-Service Hospitality Asset (120 Keys, 12 Floors)
 
 1. CONFIDENTIAL INFORMATION
-The undersigned acknowledges that all information regarding the confidential hotel investment opportunity in Deira, Dubai ("Property"), including but not limited to financial data, tenant information, property specifications, and any other materials provided, constitutes Confidential Information.
+The Recipient acknowledges that all information regarding the above-referenced investment opportunity ("Property"), including but not limited to financial data, tenant information, property specifications, valuation reports, and any other materials provided, constitutes Confidential Information.
 
 2. NON-DISCLOSURE OBLIGATION
-The undersigned agrees to:
-a) Maintain the confidentiality of all Confidential Information
+The Recipient agrees to:
+a) Maintain strict confidentiality of all Confidential Information
 b) Not disclose any Confidential Information to any third party without prior written consent
-c) Use the Confidential Information solely for the purpose of evaluating the investment opportunity
+c) Use the Confidential Information solely for evaluating the investment opportunity
 d) Not copy, reproduce, or distribute any Confidential Information
+e) Not contact the property, tenants, or operators directly
 
 3. RETURN OF MATERIALS
-Upon request or upon deciding not to proceed with the investment, the undersigned shall return or destroy all Confidential Information received.
+Upon request or upon deciding not to proceed, the Recipient shall return or destroy all Confidential Information received within 5 business days.
 
 4. NO OBLIGATION
 This Agreement does not obligate either party to complete any transaction relating to the Property.
 
-5. TERM
-This Agreement shall remain in effect for a period of two (2) years from the date of acceptance.
+5. TERM AND EXPIRY
+This Agreement shall remain in effect until ${expiryDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.
+
+6. GOVERNING LAW
+This Agreement shall be governed by the laws of the DIFC, Dubai, UAE.
+
+ACCEPTANCE TIMESTAMP: ${now.toISOString()}
+RECIPIENT IDENTIFIER: ${email}
 
 By accepting below, you acknowledge that you have read, understood, and agree to be bound by the terms of this Agreement.`;
+}
 
 const RegistrationPage = () => {
   const [step, setStep] = useState(1);
   const [ndaAccepted, setNdaAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [autoApproved, setAutoApproved] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     phoneNumber: "",
@@ -84,40 +108,44 @@ const RegistrationPage = () => {
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from("investor_registrations").insert({
-        full_name: formData.email.trim().toLowerCase(),
-        email: formData.email.trim().toLowerCase(),
-        phone_number: formData.phoneNumber.trim(),
-        investor_type: "private_investor" as any,
-        investment_capacity: "under_5m" as any,
-        nda_accepted_at: new Date().toISOString(),
+      const { data, error } = await supabase.functions.invoke("register-investor", {
+        body: {
+          email: formData.email.trim().toLowerCase(),
+          phoneNumber: formData.phoneNumber.trim(),
+          ndaAcceptedAt: new Date().toISOString(),
+        },
       });
 
-      if (error) {
-        if (error.code === "23505") {
-          toast({
-            title: "Already registered",
-            description: "This email is already registered. Please wait for approval.",
-            variant: "destructive",
-          });
-        } else {
-          throw error;
-        }
+      if (error) throw error;
+
+      if (data.error === "already_registered") {
+        toast({
+          title: "Already registered",
+          description: "This email is already registered. Please check your email or wait for approval.",
+          variant: "destructive",
+        });
         return;
       }
 
+      if (!data.success) {
+        throw new Error(data.message || "Registration failed");
+      }
+
+      setAutoApproved(data.autoApproved === true);
       setStep(3);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Registration error:", error);
       toast({
         title: "Registration failed",
-        description: "There was an error submitting your registration. Please try again.",
+        description: error.message || "There was an error submitting your registration. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const ndaText = generateNdaText(formData.email || "investor@company.com");
 
   return (
     <div className="min-h-screen bg-secondary flex items-center justify-center px-4 py-12">
@@ -137,9 +165,7 @@ const RegistrationPage = () => {
               </div>
               {s < 3 && (
                 <div
-                  className={`w-16 h-0.5 mx-2 ${
-                    step > s ? "bg-accent" : "bg-muted"
-                  }`}
+                  className={`w-16 h-0.5 mx-2 ${step > s ? "bg-accent" : "bg-muted"}`}
                 />
               )}
             </div>
@@ -155,7 +181,7 @@ const RegistrationPage = () => {
           <h1 className="text-2xl font-display font-bold">
             {step === 1 && "Non-Disclosure Agreement"}
             {step === 2 && "Your Details"}
-            {step === 3 && "Registration Complete"}
+            {step === 3 && (autoApproved ? "Access Granted" : "Registration Complete")}
           </h1>
         </div>
 
@@ -174,7 +200,7 @@ const RegistrationPage = () => {
               </div>
 
               <div className="bg-muted p-4 h-64 overflow-y-auto text-sm leading-relaxed mb-6 font-mono">
-                <pre className="whitespace-pre-wrap">{NDA_TEXT}</pre>
+                <pre className="whitespace-pre-wrap">{ndaText}</pre>
               </div>
 
               <label className="flex items-start gap-3 cursor-pointer mb-6">
@@ -186,8 +212,7 @@ const RegistrationPage = () => {
                 />
                 <span className="text-sm">
                   I have read and agree to the terms of this Non-Disclosure Agreement.
-                  I understand that all information shared is confidential and
-                  proprietary.
+                  I understand that all information shared is confidential and proprietary.
                 </span>
               </label>
 
@@ -288,28 +313,49 @@ const RegistrationPage = () => {
               animate={{ opacity: 1, scale: 1 }}
               className="bg-background border border-border p-8 text-center"
             >
-              <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle className="w-8 h-8 text-accent" />
+              <div className={`w-16 h-16 ${autoApproved ? "bg-green-100" : "bg-accent/10"} rounded-full flex items-center justify-center mx-auto mb-6`}>
+                {autoApproved ? (
+                  <Sparkles className="w-8 h-8 text-green-600" />
+                ) : (
+                  <CheckCircle className="w-8 h-8 text-accent" />
+                )}
               </div>
 
               <h2 className="text-2xl font-display font-bold mb-4">
-                Thank You for Registering
+                {autoApproved ? "Access Granted!" : "Thank You for Registering"}
               </h2>
 
-              <p className="text-muted-foreground mb-6">
-                Your registration has been submitted and is under review. Our team
-                will verify your credentials and you'll receive an email and WhatsApp
-                notification once your access has been approved.
-              </p>
-
-              <div className="bg-muted p-4 text-sm text-left mb-6">
-                <div className="font-semibold mb-2">What happens next?</div>
-                <ul className="space-y-2 text-muted-foreground">
-                  <li>1. Our team reviews your registration (typically 24-48 hours)</li>
-                  <li>2. You'll receive a notification upon approval</li>
-                  <li>3. Access the full investment teaser via the link provided</li>
-                </ul>
-              </div>
+              {autoApproved ? (
+                <>
+                  <p className="text-muted-foreground mb-6">
+                    Your registration has been automatically verified. Check your email for a secure link to access the investment teaser.
+                  </p>
+                  <div className="bg-green-50 border border-green-200 p-4 text-sm text-left mb-6">
+                    <div className="font-semibold text-green-800 mb-2">✅ Instant Access</div>
+                    <ul className="space-y-1 text-green-700">
+                      <li>• A secure, device-bound link has been sent to your email</li>
+                      <li>• The link expires in 24 hours for security</li>
+                      <li>• All information is subject to the NDA you accepted</li>
+                    </ul>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-muted-foreground mb-6">
+                    Your registration has been submitted and is under review. Our team
+                    will verify your credentials and you'll receive an email and WhatsApp
+                    notification once your access has been approved.
+                  </p>
+                  <div className="bg-muted p-4 text-sm text-left mb-6">
+                    <div className="font-semibold mb-2">What happens next?</div>
+                    <ul className="space-y-2 text-muted-foreground">
+                      <li>1. Our team reviews your registration (typically 24-48 hours)</li>
+                      <li>2. You'll receive a notification upon approval</li>
+                      <li>3. Access the full investment teaser via the secure link provided</li>
+                    </ul>
+                  </div>
+                </>
+              )}
 
               <button
                 onClick={() => navigate("/")}

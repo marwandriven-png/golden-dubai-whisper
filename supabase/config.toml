@@ -2,3 +2,9 @@ project_id = "jwtkwuiigdoxxevekmdx"
 
 [functions.notify-investor]
 verify_jwt = false
+
+[functions.register-investor]
+verify_jwt = false
+
+[functions.sync-google-sheets]
+verify_jwt = false

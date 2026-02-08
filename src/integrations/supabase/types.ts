@@ -181,6 +181,7 @@ export type Database = {
           created_at: string
           email: string
           email_reputation_score: number | null
+          email_verified: boolean
           full_name: string
           id: string
           investment_capacity: Database["public"]["Enums"]["investment_capacity"]
@@ -193,6 +194,8 @@ export type Database = {
           referral_source: string | null
           rejection_reason: string | null
           updated_at: string
+          verification_token: string | null
+          verification_token_expires_at: string | null
         }
         Insert: {
           access_token_id?: string | null
@@ -205,6 +208,7 @@ export type Database = {
           created_at?: string
           email: string
           email_reputation_score?: number | null
+          email_verified?: boolean
           full_name: string
           id?: string
           investment_capacity: Database["public"]["Enums"]["investment_capacity"]
@@ -217,6 +221,8 @@ export type Database = {
           referral_source?: string | null
           rejection_reason?: string | null
           updated_at?: string
+          verification_token?: string | null
+          verification_token_expires_at?: string | null
         }
         Update: {
           access_token_id?: string | null
@@ -229,6 +235,7 @@ export type Database = {
           created_at?: string
           email?: string
           email_reputation_score?: number | null
+          email_verified?: boolean
           full_name?: string
           id?: string
           investment_capacity?: Database["public"]["Enums"]["investment_capacity"]
@@ -241,6 +248,8 @@ export type Database = {
           referral_source?: string | null
           rejection_reason?: string | null
           updated_at?: string
+          verification_token?: string | null
+          verification_token_expires_at?: string | null
         }
         Relationships: [
           {

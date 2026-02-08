@@ -30,7 +30,6 @@ function capitalizeFirst(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-// Common disposable email domains
 const DISPOSABLE_DOMAINS = new Set([
   "mailinator.com", "guerrillamail.com", "tempmail.com", "throwaway.email",
   "yopmail.com", "sharklasers.com", "guerrillamailblock.com", "grr.la",
@@ -44,17 +43,12 @@ const DISPOSABLE_DOMAINS = new Set([
 function isValidEmailDomain(email: string): { valid: boolean; reason?: string } {
   const domain = email.split("@")[1]?.toLowerCase();
   if (!domain) return { valid: false, reason: "Invalid email format" };
-  
-  // Check disposable
   if (DISPOSABLE_DOMAINS.has(domain)) {
     return { valid: false, reason: "Disposable or temporary email addresses are not accepted. Please use your business email." };
   }
-  
-  // Check for obviously invalid patterns
   if (domain.length < 4 || !domain.includes(".")) {
     return { valid: false, reason: "This email domain is not valid. Please use a valid business email." };
   }
-
   return { valid: true };
 }
 
@@ -106,6 +100,72 @@ RECIPIENT IDENTIFIER: ${email}
 By accepting, the Recipient acknowledges they have read, understood, and agree to be bound by this Agreement.`;
 }
 
+function buildApprovalEmail(teaserLink: string, companyName: string): string {
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+      <div style="background: #1a1a2e; color: #ffffff; padding: 30px; text-align: center;">
+        <h1 style="margin: 0; font-size: 24px; letter-spacing: 2px;">CONFIDENTIAL INVESTMENT</h1>
+        <p style="margin: 8px 0 0; font-size: 12px; opacity: 0.7; letter-spacing: 3px;">HOTEL ASSET • DEIRA, DUBAI</p>
+      </div>
+      <div style="padding: 30px; background: #ffffff; border: 1px solid #e5e5e5;">
+        <h2 style="color: #1a1a2e; margin-top: 0;">Access Approved</h2>
+        <p style="color: #555; line-height: 1.6;">
+          Dear ${companyName} team,<br><br>
+          Your registration has been verified and approved. You now have exclusive access to the confidential hotel investment opportunity in Deira, Dubai.
+        </p>
+        <div style="margin: 24px 0; text-align: center;">
+          <a href="${teaserLink}" style="display: inline-block; background: #c9a84c; color: #1a1a2e; padding: 14px 28px; text-decoration: none; font-weight: 600; letter-spacing: 1px;">
+            VIEW INVESTMENT TEASER
+          </a>
+        </div>
+        <div style="background: #f8f8f8; padding: 16px; margin: 20px 0; border-left: 3px solid #c9a84c;">
+          <p style="margin: 0; color: #555; font-size: 13px;">
+            <strong>⏰ Time-Limited Access:</strong> This link expires in 24 hours and is bound to your device for security.
+          </p>
+        </div>
+        <p style="color: #888; font-size: 13px; line-height: 1.5;">
+          All information shared is strictly confidential per the NDA you accepted. Do not share or forward this link.
+        </p>
+      </div>
+      <div style="text-align: center; padding: 20px; color: #aaa; font-size: 11px;">
+        <p>This is a confidential communication. Unauthorized distribution is prohibited.</p>
+      </div>
+    </div>
+  `;
+}
+
+function buildVerificationEmail(verifyLink: string, companyName: string): string {
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+      <div style="background: #1a1a2e; color: #ffffff; padding: 30px; text-align: center;">
+        <h1 style="margin: 0; font-size: 24px; letter-spacing: 2px;">CONFIDENTIAL INVESTMENT</h1>
+        <p style="margin: 8px 0 0; font-size: 12px; opacity: 0.7; letter-spacing: 3px;">HOTEL ASSET • DEIRA, DUBAI</p>
+      </div>
+      <div style="padding: 30px; background: #ffffff; border: 1px solid #e5e5e5;">
+        <h2 style="color: #1a1a2e; margin-top: 0;">Verify Your Email</h2>
+        <p style="color: #555; line-height: 1.6;">
+          Dear ${companyName} team,<br><br>
+          Thank you for registering your interest in this confidential hotel investment opportunity. Please verify your email address to complete your registration.
+        </p>
+        <div style="margin: 24px 0; text-align: center;">
+          <a href="${verifyLink}" style="display: inline-block; background: #c9a84c; color: #1a1a2e; padding: 14px 28px; text-decoration: none; font-weight: 600; letter-spacing: 1px;">
+            VERIFY EMAIL ADDRESS
+          </a>
+        </div>
+        <div style="background: #f8f8f8; padding: 16px; margin: 20px 0; border-left: 3px solid #c9a84c;">
+          <p style="margin: 0; color: #555; font-size: 13px;">
+            <strong>⏰ Important:</strong> This verification link expires in 24 hours. After verification, our team will review your request and grant access.
+          </p>
+        </div>
+        <p style="color: #888; font-size: 13px;">If you did not request this, please ignore this email.</p>
+      </div>
+      <div style="text-align: center; padding: 20px; color: #aaa; font-size: 11px;">
+        <p>Confidential communication. Unauthorized distribution prohibited.</p>
+      </div>
+    </div>
+  `;
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -126,15 +186,10 @@ serve(async (req: Request) => {
     const cleanPhone = phoneNumber.trim();
     const companyName = capitalizeFirst(getDomainFromEmail(cleanEmail));
 
-    // Validate email domain
     const emailValidation = isValidEmailDomain(cleanEmail);
     if (!emailValidation.valid) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "invalid_email",
-          message: emailValidation.reason 
-        }),
+        JSON.stringify({ success: false, error: "invalid_email", message: emailValidation.reason }),
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -144,7 +199,7 @@ serve(async (req: Request) => {
     // Check for duplicate
     const { data: existing } = await supabase
       .from("investor_registrations")
-      .select("id, approval_status")
+      .select("id, approval_status, email_verified")
       .eq("email", cleanEmail)
       .maybeSingle();
 
@@ -164,7 +219,6 @@ serve(async (req: Request) => {
         if (existingToken && new Date(existingToken.expires_at) > new Date()) {
           tokenStr = existingToken.token;
         } else {
-          // Generate fresh token
           tokenStr = generateToken();
           const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
           const { data: newToken } = await supabase
@@ -181,16 +235,12 @@ serve(async (req: Request) => {
         }
 
         return new Response(
-          JSON.stringify({ 
-            success: true, 
-            autoApproved: true,
-            accessToken: tokenStr,
-            message: "You're already approved!" 
-          }),
+          JSON.stringify({ success: true, autoApproved: true, accessToken: tokenStr, message: "You're already approved!" }),
           { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
 
+      // Check pre-approved for existing pending registration
       const { data: preApproved } = await supabase
         .from("pre_approved_contacts")
         .select("id, source")
@@ -217,6 +267,7 @@ serve(async (req: Request) => {
             approval_source: source,
             access_token_id: tokenData?.id || null,
             phone_number: cleanPhone,
+            email_verified: true,
           })
           .eq("id", existing.id);
 
@@ -230,38 +281,28 @@ serve(async (req: Request) => {
             to: [cleanEmail],
             subject: "Your Investment Access Has Been Approved",
             html: buildApprovalEmail(teaserLink, companyName),
-            attachments: [{
-              filename: "NDA-Confidential-Hotel-Investment.txt",
-              content: btoa(ndaText),
-            }],
+            attachments: [{ filename: "NDA-Confidential-Hotel-Investment.txt", content: btoa(ndaText) }],
           });
         } catch (emailErr) {
           console.error("Email send error:", emailErr);
         }
 
         return new Response(
-          JSON.stringify({ 
-            success: true, 
-            autoApproved: true,
-            accessToken: token,
-            message: "Your registration has been approved. Check your email for access." 
-          }),
+          JSON.stringify({ success: true, autoApproved: true, accessToken: token, message: "Your registration has been approved." }),
           { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
 
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "already_registered",
-          message: "This email is already registered. Please wait for approval.",
-          status: existing.approval_status 
-        }),
+        JSON.stringify({ success: false, error: "already_registered", message: "This email is already registered. Please check your email for verification or wait for approval.", status: existing.approval_status }),
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
-    // Insert registration
+    // Insert new registration
+    const verificationToken = generateToken();
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
     const { data: registration, error: insertError } = await supabase
       .from("investor_registrations")
       .insert({
@@ -274,6 +315,9 @@ serve(async (req: Request) => {
         investment_capacity: "under_5m",
         nda_accepted_at: ndaAcceptedAt || new Date().toISOString(),
         approval_source: "manual",
+        email_verified: false,
+        verification_token: verificationToken,
+        verification_token_expires_at: verificationExpires,
       })
       .select()
       .single();
@@ -315,6 +359,9 @@ serve(async (req: Request) => {
           approved_at: new Date().toISOString(),
           approval_source: source,
           access_token_id: tokenData?.id || null,
+          email_verified: true,
+          verification_token: null,
+          verification_token_expires_at: null,
         })
         .eq("id", registration.id);
 
@@ -328,10 +375,7 @@ serve(async (req: Request) => {
           to: [cleanEmail],
           subject: "Your Investment Access Has Been Approved",
           html: buildApprovalEmail(teaserLink, companyName),
-          attachments: [{
-            filename: "NDA-Confidential-Hotel-Investment.txt",
-            content: btoa(ndaText),
-          }],
+          attachments: [{ filename: "NDA-Confidential-Hotel-Investment.txt", content: btoa(ndaText) }],
         });
         console.log(`Approval email with NDA sent to ${cleanEmail}`);
       } catch (emailErr) {
@@ -339,68 +383,30 @@ serve(async (req: Request) => {
       }
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          autoApproved: true,
-          accessToken: token,
-          message: "Your registration has been auto-approved. Check your email for access." 
-        }),
+        JSON.stringify({ success: true, autoApproved: true, accessToken: token, message: "Your registration has been auto-approved." }),
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
-    console.log(`Registration pending manual approval: ${registration.id}`);
+    // Non-pre-approved: send verification email
+    console.log(`Sending verification email to ${cleanEmail}`);
+    const appUrl = "https://golden-dubai-whisper.lovable.app";
+    const verifyLink = `${appUrl}/verify-email?token=${verificationToken}`;
 
-    // Send confirmation email to investor
     try {
       await resend.emails.send({
         from: "Investment Team <onboarding@resend.dev>",
         to: [cleanEmail],
-        subject: "Registration Received – Under Review",
-        html: buildConfirmationEmail(companyName),
+        subject: "Verify Your Email – Confidential Investment Access",
+        html: buildVerificationEmail(verifyLink, companyName),
       });
-      console.log(`Confirmation email sent to ${cleanEmail}`);
+      console.log(`Verification email sent to ${cleanEmail}`);
     } catch (emailErr) {
-      console.error("Confirmation email error:", emailErr);
-    }
-
-    // Notify admins about new registration
-    try {
-      const { data: adminRoles } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "admin");
-
-      if (adminRoles && adminRoles.length > 0) {
-        const adminEmails: string[] = [];
-        for (const role of adminRoles) {
-          const { data: userData } = await supabase.auth.admin.getUserById(role.user_id);
-          if (userData?.user?.email) {
-            adminEmails.push(userData.user.email);
-          }
-        }
-
-        if (adminEmails.length > 0) {
-          const appUrl = "https://golden-dubai-whisper.lovable.app";
-          await resend.emails.send({
-            from: "Investment Team <onboarding@resend.dev>",
-            to: adminEmails,
-            subject: `New Access Request: ${companyName} (${cleanEmail})`,
-            html: buildAdminNotificationEmail(cleanEmail, cleanPhone, companyName, appUrl),
-          });
-          console.log(`Admin notification sent to ${adminEmails.join(", ")}`);
-        }
-      }
-    } catch (adminEmailErr) {
-      console.error("Admin notification email error:", adminEmailErr);
+      console.error("Verification email error:", emailErr);
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        autoApproved: false,
-        message: "Registration submitted. Our team will review your request." 
-      }),
+      JSON.stringify({ success: true, autoApproved: false, message: "Please check your email to verify your address." }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error: any) {
@@ -409,106 +415,5 @@ serve(async (req: Request) => {
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
-}
-
-function buildConfirmationEmail(companyName: string): string {
-  return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-      <div style="background: #1a1a2e; color: #ffffff; padding: 30px; text-align: center;">
-        <h1 style="margin: 0; font-size: 24px; letter-spacing: 2px;">CONFIDENTIAL INVESTMENT</h1>
-        <p style="margin: 8px 0 0; font-size: 12px; opacity: 0.7; letter-spacing: 3px;">HOTEL ASSET • DEIRA, DUBAI</p>
-      </div>
-      <div style="padding: 30px; background: #ffffff; border: 1px solid #e5e5e5;">
-        <h2 style="color: #1a1a2e; margin-top: 0;">Registration Received</h2>
-        <p style="color: #555; line-height: 1.6;">
-          Dear ${companyName} team,<br><br>
-          Thank you for your interest in this confidential hotel investment opportunity. We have received your registration and NDA acceptance.
-        </p>
-        <div style="background: #f8f8f8; padding: 16px; margin: 20px 0; border-left: 3px solid #c9a84c;">
-          <p style="margin: 0; color: #555; font-size: 13px;">
-            <strong>📋 What happens next:</strong><br>
-            Our team is reviewing your registration. You will receive a secure access link via email once approved. Review typically takes 24–48 hours.
-          </p>
-        </div>
-        <p style="color: #888; font-size: 13px;">If you have any questions, please reply to this email.</p>
-      </div>
-      <div style="text-align: center; padding: 20px; color: #aaa; font-size: 11px;">
-        <p>Confidential communication. Unauthorized distribution prohibited.</p>
-      </div>
-    </div>
-  `;
-}
-
-function buildAdminNotificationEmail(email: string, phone: string, companyName: string, appUrl: string): string {
-  return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-      <div style="background: #1a1a2e; color: #ffffff; padding: 30px; text-align: center;">
-        <h1 style="margin: 0; font-size: 20px; letter-spacing: 2px;">NEW ACCESS REQUEST</h1>
-        <p style="margin: 8px 0 0; font-size: 12px; opacity: 0.7; letter-spacing: 3px;">CONFIDENTIAL INVESTMENT PLATFORM</p>
-      </div>
-      <div style="padding: 30px; background: #ffffff; border: 1px solid #e5e5e5;">
-        <div style="border-left: 4px solid #c9a84c; padding: 12px 16px; background: #fafafa; margin-bottom: 20px;">
-          <h2 style="color: #1a1a2e; margin: 0; font-size: 18px;">🔔 New Registration Pending Approval</h2>
-        </div>
-        <p style="color: #555; line-height: 1.6;">A new investor has registered and is awaiting your approval.</p>
-        <div style="background: #f8f8f8; padding: 16px; margin: 20px 0;">
-          <table style="width: 100%; font-size: 13px; color: #555;">
-            <tr><td style="padding: 4px 0; font-weight: 600;">Company:</td><td>${companyName}</td></tr>
-            <tr><td style="padding: 4px 0; font-weight: 600;">Email:</td><td>${email}</td></tr>
-            <tr><td style="padding: 4px 0; font-weight: 600;">Phone:</td><td>${phone}</td></tr>
-            <tr><td style="padding: 4px 0; font-weight: 600;">Submitted:</td><td>${new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" })}</td></tr>
-          </table>
-        </div>
-        <div style="margin: 24px 0; text-align: center;">
-          <a href="${appUrl}/admin" style="display: inline-block; background: #c9a84c; color: #1a1a2e; padding: 14px 28px; text-decoration: none; font-weight: 600; letter-spacing: 1px;">
-            REVIEW IN DASHBOARD
-          </a>
-        </div>
-      </div>
-      <div style="text-align: center; padding: 20px; color: #aaa; font-size: 11px;">
-        <p>Automated notification from the investment platform.</p>
-      </div>
-    </div>
-  `;
-}
+  }
 });
-
-function buildApprovalEmail(teaserLink: string, companyName: string): string {
-  return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-      <div style="background: #1a1a2e; color: #ffffff; padding: 30px; text-align: center;">
-        <h1 style="margin: 0; font-size: 24px; letter-spacing: 2px;">CONFIDENTIAL INVESTMENT</h1>
-        <p style="margin: 8px 0 0; font-size: 12px; opacity: 0.7; letter-spacing: 3px;">HOTEL ASSET • DEIRA, DUBAI</p>
-      </div>
-      
-      <div style="padding: 30px; background: #ffffff; border: 1px solid #e5e5e5;">
-        <h2 style="color: #1a1a2e; margin-top: 0;">Access Approved</h2>
-        <p style="color: #555; line-height: 1.6;">
-          Dear ${companyName} team,<br><br>
-          Your registration has been verified and approved. You now have exclusive access to the confidential hotel investment opportunity in Deira, Dubai.
-        </p>
-        
-        <div style="margin: 24px 0; text-align: center;">
-          <a href="${teaserLink}" 
-             style="display: inline-block; background: #c9a84c; color: #1a1a2e; padding: 14px 28px; text-decoration: none; font-weight: 600; letter-spacing: 1px;">
-            VIEW INVESTMENT TEASER
-          </a>
-        </div>
-        
-        <div style="background: #f8f8f8; padding: 16px; margin: 20px 0; border-left: 3px solid #c9a84c;">
-          <p style="margin: 0; color: #555; font-size: 13px;">
-            <strong>⏰ Time-Limited Access:</strong> This link expires in 24 hours and is bound to your device for security.
-          </p>
-        </div>
-        
-        <p style="color: #888; font-size: 13px; line-height: 1.5;">
-          All information shared is strictly confidential per the NDA you accepted. Do not share or forward this link.
-        </p>
-      </div>
-      
-      <div style="text-align: center; padding: 20px; color: #aaa; font-size: 11px;">
-        <p>This is a confidential communication. Unauthorized distribution is prohibited.</p>
-      </div>
-    </div>
-  `;
-}

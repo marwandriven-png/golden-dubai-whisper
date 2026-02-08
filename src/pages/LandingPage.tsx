@@ -94,13 +94,13 @@
              animate={{ opacity: 1, y: 0 }}
              transition={{ delay: 0.5 }}
            >
-             <Link
-               to="/register"
-               className="inline-flex items-center gap-3 bg-accent text-accent-foreground px-8 py-4 font-semibold text-lg hover:bg-accent/90 transition-colors"
-             >
-               <Lock className="w-5 h-5" />
-               <span>Request Access</span>
-             </Link>
+              <Link
+                to="/register"
+                className="inline-flex items-center gap-3 bg-accent text-accent-foreground px-8 py-4 font-semibold text-lg hover:bg-accent/90 transition-colors"
+              >
+                <Lock className="w-5 h-5" />
+                <span>Request Full Details</span>
+              </Link>
              <p className="text-sm text-muted-foreground mt-4">
                NDA acceptance required to view full investment details
              </p>

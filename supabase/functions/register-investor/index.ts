@@ -30,6 +30,82 @@ function capitalizeFirst(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+// Common disposable email domains
+const DISPOSABLE_DOMAINS = new Set([
+  "mailinator.com", "guerrillamail.com", "tempmail.com", "throwaway.email",
+  "yopmail.com", "sharklasers.com", "guerrillamailblock.com", "grr.la",
+  "dispostable.com", "trashmail.com", "10minutemail.com", "tempail.com",
+  "fakeinbox.com", "mailnesia.com", "maildrop.cc", "discard.email",
+  "temp-mail.org", "getnada.com", "emailondeck.com", "33mail.com",
+  "guerrillamail.info", "guerrillamail.net", "guerrillamail.org",
+  "mailcatch.com", "trash-mail.com", "bugmenot.com", "mintemail.com",
+]);
+
+function isValidEmailDomain(email: string): { valid: boolean; reason?: string } {
+  const domain = email.split("@")[1]?.toLowerCase();
+  if (!domain) return { valid: false, reason: "Invalid email format" };
+  
+  // Check disposable
+  if (DISPOSABLE_DOMAINS.has(domain)) {
+    return { valid: false, reason: "Disposable or temporary email addresses are not accepted. Please use your business email." };
+  }
+  
+  // Check for obviously invalid patterns
+  if (domain.length < 4 || !domain.includes(".")) {
+    return { valid: false, reason: "This email domain is not valid. Please use a valid business email." };
+  }
+
+  return { valid: true };
+}
+
+function generateNdaText(email: string): string {
+  const domain = email.split("@")[1] || "";
+  const companyName = domain.split(".")[0] || "the Recipient";
+  const capitalized = companyName.charAt(0).toUpperCase() + companyName.slice(1);
+  const now = new Date();
+  const expiryDate = new Date(now.getTime() + 2 * 365 * 24 * 60 * 60 * 1000);
+
+  return `CONFIDENTIALITY AND NON-DISCLOSURE AGREEMENT
+
+This Confidentiality and Non-Disclosure Agreement ("Agreement") is entered into as of ${now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.
+
+PARTIES:
+Disclosing Party: The Investment Sponsor ("Sponsor")
+Receiving Party: ${capitalized} ("Recipient")
+
+PROJECT: Confidential Hotel Investment Opportunity
+ASSET LOCATION: Deira, Dubai, United Arab Emirates
+ASSET TYPE: Full-Service Hospitality Asset (120 Keys, 12 Floors)
+
+1. CONFIDENTIAL INFORMATION
+The Recipient acknowledges that all information regarding the above-referenced investment opportunity, including but not limited to financial data, tenant information, property specifications, valuation reports, and any other materials provided, constitutes Confidential Information.
+
+2. NON-DISCLOSURE OBLIGATION
+The Recipient agrees to:
+a) Maintain strict confidentiality of all Confidential Information
+b) Not disclose any Confidential Information to any third party without prior written consent
+c) Use the Confidential Information solely for evaluating the investment opportunity
+d) Not copy, reproduce, or distribute any Confidential Information
+e) Not contact the property, tenants, or operators directly
+
+3. RETURN OF MATERIALS
+Upon request or upon deciding not to proceed, the Recipient shall return or destroy all Confidential Information received within 5 business days.
+
+4. NO OBLIGATION
+This Agreement does not obligate either party to complete any transaction.
+
+5. TERM AND EXPIRY
+This Agreement shall remain in effect until ${expiryDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.
+
+6. GOVERNING LAW
+This Agreement shall be governed by the laws of the DIFC, Dubai, UAE.
+
+ACCEPTANCE TIMESTAMP: ${now.toISOString()}
+RECIPIENT IDENTIFIER: ${email}
+
+By accepting, the Recipient acknowledges they have read, understood, and agree to be bound by this Agreement.`;
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -50,6 +126,19 @@ serve(async (req: Request) => {
     const cleanPhone = phoneNumber.trim();
     const companyName = capitalizeFirst(getDomainFromEmail(cleanEmail));
 
+    // Validate email domain
+    const emailValidation = isValidEmailDomain(cleanEmail);
+    if (!emailValidation.valid) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "invalid_email",
+          message: emailValidation.reason 
+        }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     console.log(`Registration attempt: ${cleanEmail}, phone: ${cleanPhone}`);
 
     // Check for duplicate
@@ -60,7 +149,6 @@ serve(async (req: Request) => {
       .maybeSingle();
 
     if (existing) {
-      // If already approved, just resend access info
       if (existing.approval_status === "approved") {
         return new Response(
           JSON.stringify({ 
@@ -72,7 +160,6 @@ serve(async (req: Request) => {
         );
       }
 
-      // If pending/rejected, check if they're now on the pre-approved list and auto-approve
       const { data: preApproved } = await supabase
         .from("pre_approved_contacts")
         .select("id, source")
@@ -104,6 +191,7 @@ serve(async (req: Request) => {
 
         const appUrl = "https://golden-dubai-whisper.lovable.app";
         const teaserLink = `${appUrl}/teaser?token=${token}`;
+        const ndaText = generateNdaText(cleanEmail);
 
         try {
           await resend.emails.send({
@@ -111,6 +199,10 @@ serve(async (req: Request) => {
             to: [cleanEmail],
             subject: "Your Investment Access Has Been Approved",
             html: buildApprovalEmail(teaserLink, companyName),
+            attachments: [{
+              filename: "NDA-Confidential-Hotel-Investment.txt",
+              content: btoa(ndaText),
+            }],
           });
         } catch (emailErr) {
           console.error("Email send error:", emailErr);
@@ -171,28 +263,19 @@ serve(async (req: Request) => {
     const isAutoApproved = preApproved && preApproved.length > 0;
 
     if (isAutoApproved) {
-      console.log(`Auto-approving investor ${registration.id} (matched pre-approved contact)`);
+      console.log(`Auto-approving investor ${registration.id}`);
       const source = preApproved[0].source || "local_db";
-
-      // Generate access token
       const token = generateToken();
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
       const { data: tokenData, error: tokenError } = await supabase
         .from("access_tokens")
-        .insert({
-          investor_id: registration.id,
-          token,
-          expires_at: expiresAt,
-        })
+        .insert({ investor_id: registration.id, token, expires_at: expiresAt })
         .select()
         .single();
 
-      if (tokenError) {
-        console.error("Token generation error:", tokenError);
-      }
+      if (tokenError) console.error("Token generation error:", tokenError);
 
-      // Update registration to approved
       await supabase
         .from("investor_registrations")
         .update({
@@ -203,9 +286,9 @@ serve(async (req: Request) => {
         })
         .eq("id", registration.id);
 
-      // Send approval email with tokenized link
       const appUrl = "https://golden-dubai-whisper.lovable.app";
       const teaserLink = `${appUrl}/teaser?token=${token}`;
+      const ndaText = generateNdaText(cleanEmail);
 
       try {
         await resend.emails.send({
@@ -213,8 +296,12 @@ serve(async (req: Request) => {
           to: [cleanEmail],
           subject: "Your Investment Access Has Been Approved",
           html: buildApprovalEmail(teaserLink, companyName),
+          attachments: [{
+            filename: "NDA-Confidential-Hotel-Investment.txt",
+            content: btoa(ndaText),
+          }],
         });
-        console.log(`Approval email sent to ${cleanEmail}`);
+        console.log(`Approval email with NDA sent to ${cleanEmail}`);
       } catch (emailErr) {
         console.error("Email send error:", emailErr);
       }
@@ -229,7 +316,6 @@ serve(async (req: Request) => {
       );
     }
 
-    // Not auto-approved — notify admin (best effort)
     console.log(`Registration pending manual approval: ${registration.id}`);
 
     return new Response(

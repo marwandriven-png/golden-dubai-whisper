@@ -364,11 +364,16 @@ const RegistrationPage = () => {
               )}
 
               <button
-                onClick={() => navigate(autoApproved ? "/teaser" : "/")}
+                onClick={() => navigate("/")}
                 className="bg-accent text-accent-foreground px-8 py-3 font-semibold hover:bg-accent/90 transition-colors"
               >
-                {autoApproved ? "Access Investment Teaser" : "Return to Home"}
+                {autoApproved ? "Return to Home" : "Return to Home"}
               </button>
+              {autoApproved && (
+                <p className="text-xs text-muted-foreground mt-4">
+                  Use the secure link sent to your email to access the teaser. Do not share or forward it.
+                </p>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

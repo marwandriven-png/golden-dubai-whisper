@@ -118,10 +118,15 @@ const RegistrationPage = () => {
 
       if (error) throw error;
 
+      if (data.error === "invalid_email") {
+        setErrors({ email: data.message || "This email is not valid for registration." });
+        return;
+      }
+
       if (data.error === "already_registered") {
         toast({
           title: "Already registered",
-          description: "This email is already registered. Please check your email or wait for approval.",
+          description: data.message || "This email is already registered. Please check your email or wait for approval.",
           variant: "destructive",
         });
         return;
@@ -334,6 +339,7 @@ const RegistrationPage = () => {
                     <div className="font-semibold text-green-800 mb-2">✅ Instant Access</div>
                     <ul className="space-y-1 text-green-700">
                       <li>• A secure, device-bound link has been sent to your email</li>
+                      <li>• The NDA document is attached to your email</li>
                       <li>• The link expires in 24 hours for security</li>
                       <li>• All information is subject to the NDA you accepted</li>
                     </ul>
@@ -358,10 +364,10 @@ const RegistrationPage = () => {
               )}
 
               <button
-                onClick={() => navigate("/")}
-                className="bg-primary text-primary-foreground px-8 py-3 font-semibold hover:bg-primary/90 transition-colors"
+                onClick={() => navigate(autoApproved ? "/teaser" : "/")}
+                className="bg-accent text-accent-foreground px-8 py-3 font-semibold hover:bg-accent/90 transition-colors"
               >
-                Return to Home
+                {autoApproved ? "Access Investment Teaser" : "Return to Home"}
               </button>
             </motion.div>
           )}

@@ -36,11 +36,11 @@ const HotelSwitcher = ({ activeHotel, onSelect }: HotelSwitcherProps) => {
           <div className="flex items-center gap-3">
             <img src={xEstateLogo} alt="X Estate" className="h-6 w-auto brightness-200" />
             <div className="h-4 w-px bg-primary-foreground/10" />
-            <span className="text-[10px] uppercase tracking-[0.15em] text-primary-foreground/50 font-medium">
+            <span className="text-xs uppercase tracking-[0.15em] text-primary-foreground/50 font-medium">
               Select Property
             </span>
           </div>
-          <span className="text-[10px] text-primary-foreground/25 font-mono tracking-wider">
+          <span className="text-xs text-primary-foreground/30 font-mono tracking-wider">
             {hotels.findIndex(h => h.id === activeHotel.id) + 1}/{hotels.length}
           </span>
         </div>
@@ -65,7 +65,7 @@ const HotelSwitcher = ({ activeHotel, onSelect }: HotelSwitcherProps) => {
                 <div className="px-3 py-2.5 sm:px-4 sm:py-3">
                   {/* Hotel name + status */}
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <h3 className={`font-display font-bold text-xs sm:text-sm leading-tight ${
+                    <h3 className={`font-display font-bold text-sm sm:text-base leading-tight ${
                       isActive ? "text-primary-foreground" : "text-primary-foreground/70"
                     }`}>
                       {hotel.name}
@@ -78,20 +78,20 @@ const HotelSwitcher = ({ activeHotel, onSelect }: HotelSwitcherProps) => {
                     isActive ? "text-primary-foreground/50" : "text-primary-foreground/30"
                   }`}>
                     <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
-                    <span className="text-[9px] sm:text-[10px] uppercase tracking-wider truncate">
+                    <span className="text-[10px] sm:text-xs uppercase tracking-wider truncate">
                       {hotel.location}, {hotel.subLocation}
                     </span>
                   </div>
 
                   {/* Metrics row */}
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm sm:text-base font-bold font-display ${
+                    <span className={`text-base sm:text-lg font-bold font-display ${
                       isActive ? "text-accent" : "text-primary-foreground/40"
                     }`}>
                       {hotel.highlight}
                     </span>
                     <span className="text-primary-foreground/10">·</span>
-                    <span className={`text-[10px] sm:text-xs ${
+                    <span className={`text-xs sm:text-sm font-medium ${
                       isActive ? "text-primary-foreground/50" : "text-primary-foreground/30"
                     }`}>
                       {hotel.keys} Keys

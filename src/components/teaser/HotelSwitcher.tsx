@@ -1,4 +1,5 @@
-import { motion } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Building2, MapPin, Key, TrendingUp, CheckCircle } from "lucide-react";
 import { hotels, type HotelData } from "@/data/hotelData";
 
@@ -8,8 +9,26 @@ interface HotelSwitcherProps {
 }
 
 const HotelSwitcher = ({ activeHotel, onSelect }: HotelSwitcherProps) => {
+  const [visible, setVisible] = useState(true);
+  const lastScrollY = useRef(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      setVisible(currentY < 50 || currentY < lastScrollY.current);
+      lastScrollY.current = currentY;
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <section className="sticky top-0 z-50 bg-primary border-b-2 border-accent/30 shadow-xl">
+    <motion.section
+      initial={{ y: 0 }}
+      animate={{ y: visible ? 0 : "-100%" }}
+      transition={{ duration: 0.3, ease: "easeInOut" }}
+      className="sticky top-0 z-50 bg-primary border-b-2 border-accent/30 shadow-xl"
+    >
       <div className="max-w-6xl mx-auto px-4 sm:px-8 lg:px-16 py-4 sm:py-5">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
@@ -122,7 +141,7 @@ const HotelSwitcher = ({ activeHotel, onSelect }: HotelSwitcherProps) => {
           })}
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 };
 

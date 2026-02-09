@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Building2, MapPin, Key, TrendingUp, CheckCircle } from "lucide-react";
+import { MapPin, Key, TrendingUp, CheckCircle } from "lucide-react";
 import { hotels, type HotelData } from "@/data/hotelData";
+import xEstateLogo from "@/assets/x-estate-logo.svg";
 
 interface HotelSwitcherProps {
   activeHotel: HotelData;
@@ -27,20 +28,23 @@ const HotelSwitcher = ({ activeHotel, onSelect }: HotelSwitcherProps) => {
       initial={{ y: 0 }}
       animate={{ y: visible ? 0 : "-100%" }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
-      className="sticky top-0 z-50 bg-primary/80 backdrop-blur-xl border-b border-accent/15 shadow-[0_4px_40px_rgba(0,0,0,0.4)] animate-shimmer-border before:absolute before:inset-0 before:bg-gradient-to-r before:from-accent/5 before:via-transparent before:to-accent/5 before:pointer-events-none"
+      className="sticky top-0 z-50 bg-primary border-b border-accent/20 shadow-[0_2px_24px_rgba(0,0,0,0.35)]"
     >
-      <div className="max-w-6xl mx-auto px-4 sm:px-8 lg:px-16 py-4 sm:py-5">
-        {/* Header */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-8 lg:px-16 py-3 sm:py-4">
+        {/* Header row with logo */}
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-accent" />
-            <span className="text-[11px] sm:text-xs uppercase tracking-[0.2em] text-accent font-bold">
-              Investment Portfolio — Select Property
+          <div className="flex items-center gap-3">
+            <img src={xEstateLogo} alt="X Estate" className="h-7 sm:h-8 w-auto brightness-200" />
+            <div className="h-5 w-px bg-primary-foreground/15" />
+            <span className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-accent font-semibold">
+              Investment Portfolio
             </span>
           </div>
-          <span className="text-[10px] sm:text-xs text-primary-foreground/40 uppercase tracking-wider">
-            {hotels.findIndex(h => h.id === activeHotel.id) + 1} of {hotels.length}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] sm:text-xs text-primary-foreground/30 uppercase tracking-wider font-mono">
+              {hotels.findIndex(h => h.id === activeHotel.id) + 1} / {hotels.length}
+            </span>
+          </div>
         </div>
 
         {/* Hotel Cards */}

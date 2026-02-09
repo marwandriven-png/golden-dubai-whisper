@@ -92,12 +92,18 @@ export default {
           "0%": { opacity: "0", transform: "translateY(20px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        "shimmer-border": {
+          "0%": { borderColor: "hsl(43 74% 52% / 0.2)" },
+          "50%": { borderColor: "hsl(43 74% 72% / 0.6)" },
+          "100%": { borderColor: "hsl(43 74% 52% / 0.2)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-ring": "pulse-ring 2s ease-out infinite",
         "fade-in-up": "fade-in-up 0.6s ease-out forwards",
+        "shimmer-border": "shimmer-border 3s ease-in-out infinite",
       },
     },
   },

@@ -27,7 +27,7 @@ const HotelSwitcher = ({ activeHotel, onSelect }: HotelSwitcherProps) => {
       initial={{ y: 0 }}
       animate={{ y: visible ? 0 : "-100%" }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
-      className="sticky top-0 z-50 bg-primary/95 backdrop-blur-md border-b border-accent/20 shadow-[0_2px_20px_rgba(0,0,0,0.25)] animate-shimmer-border"
+      className="sticky top-0 z-50 bg-primary/80 backdrop-blur-xl border-b border-accent/15 shadow-[0_4px_40px_rgba(0,0,0,0.4)] animate-shimmer-border before:absolute before:inset-0 before:bg-gradient-to-r before:from-accent/5 before:via-transparent before:to-accent/5 before:pointer-events-none"
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-8 lg:px-16 py-4 sm:py-5">
         {/* Header */}

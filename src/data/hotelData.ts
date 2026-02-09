@@ -229,7 +229,7 @@ export const hotels: HotelData[] = [
     ownership: "GCC Only",
     transaction: "Asset Sale",
     locationBadge: {
-      title: "Rolla Street\nBur Dubai",
+      title: "Al Muraqabat\nDubai",
       subtitle: "Dubai • UAE",
     },
     metrics: [
@@ -290,20 +290,20 @@ export const hotels: HotelData[] = [
       { icon: "landmark", label: "Al Fahidi Historic District", distance: "7 min" },
     ],
     locationDescription:
-      "Situated on Rolla Street in the Al Raffa area of Bur Dubai, this asset benefits from exceptional footfall, creek proximity, and established tourism demand in one of Dubai's most vibrant districts.",
+      "Situated in Al Muraqabat, Dubai, this asset benefits from exceptional footfall and established tourism demand in one of Dubai's most vibrant commercial districts.",
     locationOverlay: {
-      tag: "Rolla Street",
-      title: "Al Raffa, Bur Dubai",
-      description: "High-traffic commercial corridor with creek proximity and dense hospitality demand.",
+      tag: "Al Muraqabat",
+      title: "Al Muraqabat, Dubai",
+      description: "High-traffic commercial corridor with strong hospitality demand and excellent connectivity.",
     },
     locationAdvantages: [
       {
-        title: "Rolla Street Hub",
-        description: "Prime position on Rolla Street, one of Bur Dubai's busiest commercial and entertainment corridors.",
+        title: "Al Muraqabat Hub",
+        description: "Prime position in Al Muraqabat, one of Dubai's busiest commercial and hospitality corridors.",
       },
       {
         title: "Transport Connectivity",
-        description: "Al Ghubaiba Metro & Bus Station nearby. Direct links to Deira, Downtown, and Dubai Marina.",
+        description: "Salah Al Din Metro Station nearby. Direct links to Deira, Downtown, and Dubai Marina.",
       },
     ],
     whyInvest: [
@@ -405,14 +405,14 @@ export const hotels: HotelData[] = [
     locationDescription:
       "Located on Rolla Street in the Al Raffa area of Bur Dubai, this asset commands exceptional visibility on Plot P515 with dual basement infrastructure and proximity to Dubai Creek.",
     locationOverlay: {
-      tag: "Rolla Street",
-      title: "Al Raffa, Bur Dubai",
+      tag: "Rolla St, Al Raffa",
+      title: "Rolla St, Al Raffa, Dubai",
       description: "Established hospitality corridor with creek proximity, metro access, and high tourist footfall.",
     },
     locationAdvantages: [
       {
-        title: "Rolla Corridor",
-        description: "Prime plot (P515) on Rolla Street, Bur Dubai's most established hotel and entertainment strip.",
+        title: "Rolla St Corridor",
+        description: "Prime plot (P515) on Rolla St, Al Raffa, Dubai's established hotel and entertainment strip.",
       },
       {
         title: "Transport Hub",
